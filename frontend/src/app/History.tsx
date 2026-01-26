@@ -93,6 +93,7 @@ export enum URLParam {
   REFRESH_INTERVAL = 'refresh',
   REPORTER = 'reporter',
   SHOW_AVERAGE = 'avg',
+  SHOW_DEPLOYMENTS = 'deployments',
   SHOW_SPANS = 'spans',
   SHOW_TRENDLINES = 'trendlines',
   SHOW_WAYPOINT = 'waypoint',

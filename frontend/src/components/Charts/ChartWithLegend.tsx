@@ -47,6 +47,7 @@ type Props<T extends RichDataPoint, O extends LineInfo> = {
   // It could be detected indirectly, but it's complicated and less clear, a new optional flag simplifies this logic
   pointer?: boolean;
   seriesComponent: React.ReactElement;
+  showDeployments?: boolean;
   showSpans?: boolean;
   showTrendline?: boolean;
   sizeRatio?: number;
@@ -457,9 +458,34 @@ export class ChartWithLegend<T extends RichDataPoint, O extends LineInfo> extend
 
   private renderTimeSeries = (height: number): React.ReactNode => {
     const groupOffset = this.props.groupOffset ?? 0;
+    const yMax = this.props.data.reduce((maxY, serie) => {
+      return Math.max(
+        maxY,
+        serie.datapoints.reduce((maxData, cur) => {
+          return Math.max(maxData, cur.y);
+        }, 0)
+      );
+    }, 0);
+
+    const timeStamp = new Date(new Date().getTime() - 5 * 60 * 1000);
 
     return (
       <ChartGroup offset={groupOffset} height={height}>
+        {/*todo display custom text on tooltip*/}
+        {this.props.showDeployments && (
+          <ChartLine
+            {...{
+              key: `Deployment-X`,
+              name: `Deployment-X`,
+              data: [
+                { x: timeStamp, y: 0, name: 'Deployment 4af20fb' },
+                { x: timeStamp, y: yMax }
+              ],
+              interpolation: INTERPOLATION_STRATEGY
+            }}
+          />
+        )}
+
         {this.props.data
           .map((serie, idx) => {
             if (this.state.hiddenSeries.has(serie.legendItem.name)) {

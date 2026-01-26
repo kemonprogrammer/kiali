@@ -176,12 +176,18 @@ export const retrieveMetricsSettings = (limitDefault?: number): MetricsSettings 
     showSpans: false,
     spanLimit: limitDefault ?? TRACE_LIMIT_DEFAULT,
     showQuantiles: [],
-    showTrendlines: false
+    showTrendlines: false,
+    showDeployments: false
   };
 
   const avg = urlParams.get(URLParam.SHOW_AVERAGE);
   if (avg !== null) {
     settings.showAverage = avg === 'true';
+  }
+
+  const deployments = urlParams.get(URLParam.SHOW_DEPLOYMENTS);
+  if (deployments !== null) {
+    settings.showDeployments = deployments === 'true';
   }
 
   const spans = urlParams.get(URLParam.SHOW_SPANS);

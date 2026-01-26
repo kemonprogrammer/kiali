@@ -44,6 +44,7 @@ type MetricsState = {
   isTimeOptionsOpen: boolean;
   labelsSettings: LabelsSettings;
   persesInfo: PersesInfo;
+  showDeployments?: boolean;
   showSpans: boolean;
   showTrendlines: boolean;
   spanOverlay?: Overlay<JaegerLineInfo>;
@@ -110,6 +111,7 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
         externalLinks: []
       },
       tabHeight: 300,
+      showDeployments: settings.showDeployments,
       showSpans: settings.showSpans,
       showTrendlines: settings.showTrendlines,
       traceLimit: settings.spanLimit
@@ -154,6 +156,7 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
       this.props.object !== prevProps.object ||
       this.props.objectType !== prevProps.objectType ||
       this.props.lastRefreshAt !== prevProps.lastRefreshAt ||
+      this.state.showDeployments !== prevState.showDeployments ||
       this.state.showSpans !== prevState.showSpans ||
       this.state.traceLimit !== prevState.traceLimit ||
       !isEqualTimeRange(this.props.timeRange, prevProps.timeRange)
@@ -164,6 +167,7 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
 
         this.setState({
           labelsSettings: settings.labelsSettings,
+          showDeployments: settings.showDeployments,
           showSpans: settings.showSpans,
           showTrendlines: settings.showTrendlines,
           traceLimit: settings.spanLimit
@@ -187,6 +191,18 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
         target: this.props.object,
         targetKind: this.props.objectType
       });
+    }
+
+    if (this.state.showDeployments) {
+      // todo fetch deployments from BE
+      // this.spanOverlay.fetch({
+      //   cluster: this.props.cluster,
+      //   limit: this.state.traceLimit,
+      //   namespace: this.props.namespace,
+      //   range: this.props.timeRange,
+      //   target: this.props.object,
+      //   targetKind: this.props.objectType
+      // });
     }
   };
 
@@ -360,6 +376,7 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
                   onClick={this.onClickDataPoint}
                   labelPrettifier={MetricsHelper.prettyLabelValues}
                   overlay={this.state.spanOverlay}
+                  showDeployments={this.state.showDeployments}
                   showSpans={this.state.showSpans}
                   showTrendlines={this.state.showTrendlines}
                   dashboardHeight={dashboardHeight}
@@ -380,6 +397,13 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
       </>
     );
   }
+
+  private onDeployments = (checked: boolean): void => {
+    const urlParams = new URLSearchParams(location.getSearch());
+    urlParams.set(URLParam.SHOW_DEPLOYMENTS, String(checked));
+    router.navigate(`${location.getPathname()}?${urlParams.toString()}`, { replace: true });
+    this.setState({ showDeployments: !this.state.showDeployments });
+  };
 
   private onTraceSpansChange = (checked: boolean, limit: number): void => {
     const urlParams = new URLSearchParams(location.getSearch());
@@ -457,6 +481,17 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
                 key="trendlines-show-chart"
                 label="Trendlines"
                 onChange={(_event, checked) => this.onTrendlines(checked)}
+              />
+            </ToolbarItem>
+
+            {/*todo pass Deployments integration from props, like tracing integration*/}
+            <ToolbarItem>
+              <Checkbox
+                id="deployments-show-"
+                isChecked={this.state.showDeployments}
+                key="deployments-show-chart"
+                label="Deployments"
+                onChange={(_event, checked) => this.onDeployments(checked)}
               />
             </ToolbarItem>
 

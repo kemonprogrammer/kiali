@@ -1,9 +1,6 @@
 import * as React from 'react';
 import { Grid, GridItem } from '@patternfly/react-core';
-import {
-	ChartThemeColor,
-	getTheme
-} from '@patternfly/react-charts/victory';
+import { ChartThemeColor, getTheme } from '@patternfly/react-charts/victory';
 
 import { AllPromLabelsValues } from 'types/Metrics';
 import { ChartModel, DashboardModel } from 'types/Dashboards';
@@ -15,20 +12,21 @@ import { BrushHandlers } from './Container';
 import { isArray } from 'lodash';
 
 export type Props<T extends LineInfo> = {
-  colors?: string[];
-  dashboard: DashboardModel;
-  maximizedChart?: string;
-  expandHandler: (expandedChart?: string) => void;
-  labelValues: AllPromLabelsValues;
-  labelPrettifier?: (key: string, value: string) => string;
-  onClick?: (chart: ChartModel, datum: RawOrBucket<T>) => void;
   brushHandlers?: BrushHandlers;
-  template?: string;
+  colors?: string[];
+  customMetric?: boolean;
+  dashboard: DashboardModel;
   dashboardHeight: number;
+  expandHandler: (expandedChart?: string) => void;
+  labelPrettifier?: (key: string, value: string) => string;
+  labelValues: AllPromLabelsValues;
+  maximizedChart?: string;
+  onClick?: (chart: ChartModel, datum: RawOrBucket<T>) => void;
+  overlay?: Overlay<T>;
+  showDeployments?: boolean;
   showSpans: boolean;
   showTrendlines?: boolean;
-  customMetric?: boolean;
-  overlay?: Overlay<T>;
+  template?: string;
   timeWindow?: [Date, Date];
 };
 
@@ -44,7 +42,7 @@ export class Dashboard<T extends LineInfo> extends React.Component<Props<T>, Sta
     };
   }
 
-  render() {
+  render(): JSX.Element {
     if (this.state.maximizedChart) {
       const chart = this.props.dashboard.charts.find(c => c.name === this.state.maximizedChart);
       if (chart) {
@@ -77,7 +75,7 @@ export class Dashboard<T extends LineInfo> extends React.Component<Props<T>, Sta
     return this.props.dashboardHeight / rows;
   };
 
-  private renderChart(chart: ChartModel) {
+  private renderChart(chart: ChartModel): JSX.Element {
     let colorScale = this.props.colors || getTheme(ChartThemeColor.multi).chart!.colorScale!;
     if (!isArray(colorScale)) {
       colorScale = [colorScale];
@@ -96,6 +94,7 @@ export class Dashboard<T extends LineInfo> extends React.Component<Props<T>, Sta
         key={chart.name}
         chartHeight={this.getChartHeight()}
         chart={chart}
+        showDeployments={this.props.showDeployments}
         showSpans={this.props.showSpans}
         showTrendline={this.props.showTrendlines}
         data={dataSupplier()}

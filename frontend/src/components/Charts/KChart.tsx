@@ -1,17 +1,6 @@
 import * as React from 'react';
-import {
-  Button,
-  EmptyState,
-  EmptyStateBody,
-  ButtonVariant,
-  EmptyStateVariant
-} from '@patternfly/react-core';
-import {
-	ChartArea,
-	ChartBar,
-	ChartScatter,
-	ChartLine
-} from '@patternfly/react-charts/victory';
+import { Button, EmptyState, EmptyStateBody, ButtonVariant, EmptyStateVariant } from '@patternfly/react-core';
+import { ChartArea, ChartBar, ChartScatter, ChartLine } from '@patternfly/react-charts/victory';
 import { CubesIcon, ErrorCircleOIcon } from '@patternfly/react-icons';
 
 import { ChartModel } from 'types/Dashboards';
@@ -24,16 +13,17 @@ import { kialiStyle } from 'styles/StyleUtils';
 import { PFColors } from 'components/Pf/PfColors';
 
 type KChartProps<T extends LineInfo> = {
+  brushHandlers?: BrushHandlers;
   chart: ChartModel;
   chartHeight?: number;
   data: VCLines<RichDataPoint>;
   isMaximized: boolean;
-  onToggleMaximized: () => void;
   onClick?: (datum: RawOrBucket<T>) => void;
+  onToggleMaximized: () => void;
+  overlay?: Overlay<T>;
+  showDeployments?: boolean;
   showSpans: boolean;
   showTrendline?: boolean;
-  brushHandlers?: BrushHandlers;
-  overlay?: Overlay<T>;
   timeWindow?: [Date, Date];
 };
 
@@ -63,10 +53,10 @@ type State = {
 
 type ChartTypeData = {
   fill: boolean;
-  stroke: boolean;
   groupOffset: number;
   seriesComponent: React.ReactElement;
   sizeRatio: number;
+  stroke: boolean;
 };
 
 const lineInfo: ChartTypeData = {
@@ -106,7 +96,7 @@ export class KChart<T extends LineInfo> extends React.Component<KChartProps<T>, 
     };
   }
 
-  componentDidUpdate(prevProps: KChartProps<T>) {
+  componentDidUpdate(prevProps: KChartProps<T>): void {
     // Check when there is a change on empty datapoints on a refresh to draw the chart collapsed the first time
     // User can change the state after that point
     const propsIsEmpty = !this.props.data.some(s => s.datapoints.length !== 0);
@@ -124,7 +114,7 @@ export class KChart<T extends LineInfo> extends React.Component<KChartProps<T>, 
     return innerChartHeight;
   };
 
-  render() {
+  render(): JSX.Element {
     return (
       <div className={kchartStyle}>
         <div
@@ -159,7 +149,7 @@ export class KChart<T extends LineInfo> extends React.Component<KChartProps<T>, 
     );
   }
 
-  private determineChartType() {
+  private determineChartType(): ChartTypeData {
     if (this.props.chart.chartType === undefined) {
       if (this.props.chart.xAxis === 'series') {
         return barInfo;
@@ -183,7 +173,7 @@ export class KChart<T extends LineInfo> extends React.Component<KChartProps<T>, 
     }
   }
 
-  private renderChart() {
+  private renderChart(): JSX.Element | undefined {
     if (this.state.collapsed) {
       return undefined;
     }
@@ -197,6 +187,7 @@ export class KChart<T extends LineInfo> extends React.Component<KChartProps<T>, 
         seriesComponent={typeData.seriesComponent}
         fill={typeData.fill}
         stroke={typeData.stroke}
+        showDeployments={this.props.showDeployments}
         showSpans={this.props.showSpans}
         showTrendline={this.props.showTrendline}
         groupOffset={typeData.groupOffset}
@@ -217,7 +208,7 @@ export class KChart<T extends LineInfo> extends React.Component<KChartProps<T>, 
     return !this.props.data.some(s => s.datapoints.length !== 0);
   }
 
-  private renderEmpty() {
+  private renderEmpty(): JSX.Element | undefined {
     const chartHeight = this.getInnerChartHeight();
     const conditionalIcon = this.props.isMaximized ? { icon: CubesIcon } : {};
 
@@ -241,7 +232,7 @@ export class KChart<T extends LineInfo> extends React.Component<KChartProps<T>, 
     ) : undefined;
   }
 
-  private renderError() {
+  private renderError(): JSX.Element {
     const conditionalIcon = this.props.isMaximized
       ? { icon: () => <ErrorCircleOIcon style={{ color: PFColors.Danger }} width={32} height={32} /> }
       : {};
