@@ -11,6 +11,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.4
 	github.com/google/go-cmp v0.7.0
+	github.com/google/go-github/v81 v81.0.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/mitchellh/mapstructure v1.5.0
@@ -74,6 +75,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20250923004556-9e5a51aed1e8 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect

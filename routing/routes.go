@@ -1070,6 +1070,28 @@ func NewRoutes(
 			handlers.WorkloadDashboard(conf, kialiCache, clientFactory, discovery, prom, grafana),
 			true,
 		},
+		// swagger:route GET /namespaces/{namespace}/workloads/{workload}/deployments workloads workloadDeployments
+		// ---
+		// Endpoint to fetch deployments, related to a single workload
+		//
+		//     Produces:
+		//     - application/json
+		//
+		//     Schemes: http, https
+		//
+		// responses:
+		//      400: badRequestError
+		//      503: serviceUnavailableError
+		//      200: deploymentsResponse
+		//
+		{
+			"WorkloadDeployments",
+			log.MetricsLogName,
+			"GET",
+			"/api/namespaces/{namespace}/workloads/{workload}/deployments",
+			handlers.WorkloadDeployments(conf, kialiCache, clientFactory, discovery, prom, grafana),
+			true,
+		},
 		// swagger:route GET /namespaces/{namespace}/ztunnel/{workload}/dashboard workloads ztunnelDashboard
 		// ---
 		// Endpoint to fetch dashboard to be displayed, related to a ztunnel workload
