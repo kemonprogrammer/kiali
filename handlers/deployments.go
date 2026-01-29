@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v81/github"
@@ -24,6 +26,14 @@ import (
 type DeploymentsQuery struct {
 	From, To                     time.Time
 	Cluster, Namespace, Workload string
+}
+
+type DeploymentResponse struct {
+	deployment github.Deployment
+}
+
+func GetTitle(message string) string {
+	return strings.Split(message, "\n")[0]
 }
 
 // WorkloadDeployments is the API handler To fetch GitHub deployments, related To a single workload
@@ -80,6 +90,34 @@ func WorkloadDeployments(
 		//deployments = FilterTimerange(deployments, params.Start, params.End)
 		deployments := FilterTimerange(deploymentsAll, params.From, params.To)
 		//fmt.Printf("len deploys: %d", len(deployments))
+
+		for i, d := range deployments {
+			fmt.Printf("\nDeployment %d:\n", d.GetID())
+
+			fmt.Printf("sha: %s\n", d.GetSHA())
+			fmt.Printf("created at: %s\n", d.GetCreatedAt())
+
+			if len(deployments) < 2 || i+1 >= len(deployments) {
+				continue
+			}
+			head := deployments[i].GetSHA()
+			base := deployments[i+1].GetSHA()
+
+			commitCmp, _, err := client.Repositories.CompareCommits(ctx, owner, repo, base, head, &github.ListOptions{
+				Page:    0,
+				PerPage: 10, // todo handle more than 10 commits -> maybe "61 more commits\n<compare-url>"
+			})
+
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			//fmt.Printf("Head and base differ by %d commits:\n", commitCmp.GetTotalCommits())
+			for _, c := range commitCmp.Commits {
+				fmt.Printf("+ %s\n", GetTitle(c.Commit.GetMessage()))
+			}
+		}
 
 		// // leave it out for now to save github api calls
 		//successfulDeployments, err := FilterSuccessful(client, ctx, owner, repo, deployments)
