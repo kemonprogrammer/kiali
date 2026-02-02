@@ -36,10 +36,12 @@ import { GrafanaLinks } from './GrafanaLinks';
 import { PersesInfo } from '../../types/PersesInfo';
 import { PersesLinks } from './PersesLinks';
 import { ExternalServiceInfo } from '../../types/StatusState';
+import { Deployment, DeploymentsModel } from 'types/Deployments';
 
 type MetricsState = {
-  disabledFeatures?: KialiDisabledFeatures;
   dashboard?: DashboardModel;
+  deployments?: Deployment[];
+  disabledFeatures?: KialiDisabledFeatures;
   grafanaInfo: GrafanaInfo;
   isTimeOptionsOpen: boolean;
   labelsSettings: LabelsSettings;
@@ -181,6 +183,7 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
 
   private refresh = (): void => {
     this.fetchMetrics();
+    this.fetchDeployments();
 
     if (this.state.showSpans) {
       this.spanOverlay.fetch({
@@ -237,6 +240,33 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
         this.setState({
           dashboard: response.data,
           labelsSettings: labelsSettings
+        });
+      })
+      .catch(error => {
+        addError('Could not fetch metrics.', error);
+        throw error;
+      });
+  };
+
+  private fetchDeployments = (): Promise<void> => {
+    // Time range needs to be reevaluated everytime fetching
+    MetricsHelper.timeRangeToOptions(this.props.timeRange, this.options);
+    let opts = { ...this.options };
+
+    if (opts.reporter === 'both') {
+      opts.byLabels = (opts.byLabels ?? []).concat('reporter');
+    }
+
+    let promise: Promise<ApiResponse<DeploymentsModel>>;
+    promise = API.getDeployments(this.props.namespace, this.props.object, opts, this.props.cluster);
+
+    return promise
+      .then(response => {
+        // const labelsSettings = MetricsHelper.extractLabelsSettings(response.data, this.state.labelsSettings);
+        console.log({ resDeploys: response.data.deployments });
+
+        this.setState({
+          deployments: response.data.deployments
         });
       })
       .catch(error => {
@@ -376,6 +406,7 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
                   onClick={this.onClickDataPoint}
                   labelPrettifier={MetricsHelper.prettyLabelValues}
                   overlay={this.state.spanOverlay}
+                  deployments={this.state.deployments}
                   showDeployments={this.state.showDeployments}
                   showSpans={this.state.showSpans}
                   showTrendlines={this.state.showTrendlines}

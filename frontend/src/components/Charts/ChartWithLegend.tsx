@@ -28,11 +28,13 @@ import regression from 'regression';
 import { kialiStyle } from 'styles/StyleUtils';
 import { PFColors } from 'components/Pf/PfColors';
 import { VictoryVoronoiContainer } from 'victory-voronoi-container';
+import { Deployment } from '../../types/Deployments';
 
 type Props<T extends RichDataPoint, O extends LineInfo> = {
   brushHandlers?: BrushHandlers;
   chartHeight?: number;
   data: VCLines<T & VCDataPoint>;
+  deployments?: Deployment[];
   fill?: boolean;
   groupOffset?: number;
   isMaximized?: boolean;
@@ -467,24 +469,51 @@ export class ChartWithLegend<T extends RichDataPoint, O extends LineInfo> extend
       );
     }, 0);
 
-    const timeStamp = new Date(new Date().getTime() - 5 * 60 * 1000);
+    // const timeStamp = new Date(new Date().getTime() - 5 * 60 * 1000);
+    console.log({ deployments: this.props.deployments });
 
     return (
       <ChartGroup offset={groupOffset} height={height}>
         {/*todo display custom text on tooltip*/}
-        {this.props.showDeployments && (
-          <ChartLine
-            {...{
-              key: `Deployment-X`,
-              name: `Deployment-X`,
-              data: [
-                { x: timeStamp, y: 0, name: 'Deployment 4af20fb' },
-                { x: timeStamp, y: yMax }
-              ],
-              interpolation: INTERPOLATION_STRATEGY
-            }}
-          />
-        )}
+        {this.props.showDeployments &&
+          this.props.deployments?.map(deployment => {
+            const data = [
+              {
+                x: new Date(deployment.created_at),
+                y: 0,
+                name: `Deployment ${deployment.id}`
+              },
+              {
+                x: new Date(deployment.created_at),
+                y: yMax,
+                name: `Deployment ${deployment.id}`
+              }
+            ];
+            console.log({ data });
+            return (
+              <ChartLine
+                {...{
+                  key: `Deployment-${deployment.id}`,
+                  name: `Deployment-${deployment.id}`,
+                  data: data,
+                  interpolation: INTERPOLATION_STRATEGY
+                }}
+              />
+            );
+          })}
+        {/*{this.props.showDeployments && (*/}
+        {/*  <ChartLine*/}
+        {/*    {...{*/}
+        {/*      key: `Deployment-X`,*/}
+        {/*      name: `Deployment-X`,*/}
+        {/*      data: [*/}
+        {/*        { x: timeStamp, y: 0, name: 'Deployment 4af20fb' },*/}
+        {/*        { x: timeStamp, y: yMax }*/}
+        {/*      ],*/}
+        {/*      interpolation: INTERPOLATION_STRATEGY*/}
+        {/*    }}*/}
+        {/*  />*/}
+        {/*)}*/}
 
         {this.props.data
           .map((serie, idx) => {

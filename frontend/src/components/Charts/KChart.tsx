@@ -11,12 +11,14 @@ import { BrushHandlers } from './Container';
 import { KialiIcon } from '../../config/KialiIcon';
 import { kialiStyle } from 'styles/StyleUtils';
 import { PFColors } from 'components/Pf/PfColors';
+import { Deployment } from '../../types/Deployments';
 
 type KChartProps<T extends LineInfo> = {
   brushHandlers?: BrushHandlers;
   chart: ChartModel;
   chartHeight?: number;
   data: VCLines<RichDataPoint>;
+  deployments?: Deployment[];
   isMaximized: boolean;
   onClick?: (datum: RawOrBucket<T>) => void;
   onToggleMaximized: () => void;
@@ -184,6 +186,7 @@ export class KChart<T extends LineInfo> extends React.Component<KChartProps<T>, 
       <ChartWithLegend
         chartHeight={this.getInnerChartHeight()}
         data={this.props.data}
+        deployments={this.props.deployments}
         seriesComponent={typeData.seriesComponent}
         fill={typeData.fill}
         stroke={typeData.stroke}

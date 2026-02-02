@@ -82,6 +82,7 @@ import { ApiError, ApiResponse } from 'types/Api';
 import { getGVKTypeString } from '../utils/IstioConfigUtils';
 import { PersesInfo } from '../types/PersesInfo';
 import { ChatRequest } from 'types/Chatbot';
+import { DeploymentsModel } from '../types/Deployments';
 
 export const ANONYMOUS_USER = 'anonymous';
 
@@ -681,6 +682,21 @@ export const getWorkloadMetrics = (
   }
 
   return newRequest<IstioMetricsMap>(HTTP_VERBS.GET, urls.workloadMetrics(namespace, workload), queryParams, {});
+};
+
+export const getDeployments = (
+  namespace: string,
+  workload: string,
+  params: IstioMetricsOptions,
+  cluster?: string
+): Promise<ApiResponse<DeploymentsModel>> => {
+  const queryParams: QueryParams<IstioMetricsOptions> = { ...params };
+
+  if (cluster) {
+    queryParams.clusterName = cluster;
+  }
+
+  return newRequest<DeploymentsModel>(HTTP_VERBS.GET, urls.deployments(namespace, workload), queryParams, {});
 };
 
 export const getWorkloadDashboard = (
@@ -1431,7 +1447,11 @@ export const checkTracingConfig = (config: string, cluster?: string): Promise<Ap
   return newRequest<ConfigurationValidation>(HTTP_VERBS.POST, urls.tracingTestConfig, queryParams, config);
 };
 
-export const postChatAI = (provider: string, model: string, chatRequest: ChatRequest): Promise<ApiResponse<ChatResponse>> => {
+export const postChatAI = (
+  provider: string,
+  model: string,
+  chatRequest: ChatRequest
+): Promise<ApiResponse<ChatResponse>> => {
   return newRequest<any>(HTTP_VERBS.POST, urls.chatAI(provider, model), undefined, chatRequest);
 };
 

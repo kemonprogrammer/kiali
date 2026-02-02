@@ -10,6 +10,7 @@ import { KChart } from './KChart';
 import { LineInfo, RawOrBucket } from 'types/VictoryChartInfo';
 import { BrushHandlers } from './Container';
 import { isArray } from 'lodash';
+import { Deployment } from '../../types/Deployments';
 
 export type Props<T extends LineInfo> = {
   brushHandlers?: BrushHandlers;
@@ -17,6 +18,7 @@ export type Props<T extends LineInfo> = {
   customMetric?: boolean;
   dashboard: DashboardModel;
   dashboardHeight: number;
+  deployments?: Deployment[];
   expandHandler: (expandedChart?: string) => void;
   labelPrettifier?: (key: string, value: string) => string;
   labelValues: AllPromLabelsValues;
@@ -94,6 +96,7 @@ export class Dashboard<T extends LineInfo> extends React.Component<Props<T>, Sta
         key={chart.name}
         chartHeight={this.getChartHeight()}
         chart={chart}
+        deployments={this.props.deployments}
         showDeployments={this.props.showDeployments}
         showSpans={this.props.showSpans}
         showTrendline={this.props.showTrendlines}

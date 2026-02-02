@@ -139,6 +139,8 @@ const conf = {
       customDashboard: (namespace: string, template: string) =>
         `api/namespaces/${namespace}/customdashboard/${template}`,
       disabledFeatures: 'api/config/disabled',
+      deployments: (namespace: string, workload: string) =>
+        `api/namespaces/${namespace}/workloads/${workload}/deployments`,
       grafana: 'api/grafana',
       istioConfig: (namespace: string) => `api/namespaces/${namespace}/istio`,
       istioCertsInfo: () => 'api/istio/certs',
