@@ -8,19 +8,19 @@ import (
 	"github.com/kiali/kiali/deployment"
 )
 
-func toCommits(commitCmp *github.CommitsComparison) []*deployment.Commit {
-	commits := make([]*deployment.Commit, commitCmp.GetTotalCommits())
+func toCommits(commitCmp *github.CommitsComparison) []*external_deployments.Commit {
+	commits := make([]*external_deployments.Commit, commitCmp.GetTotalCommits())
 	for i, commit := range commitCmp.Commits {
 		commits[i] = toCommit(commit)
 	}
 	return commits
 }
 
-func toDeployment(ghDeploy *github.Deployment) *deployment.Deployment {
+func toDeployment(ghDeploy *github.Deployment) *external_deployments.Deployment {
 	if ghDeploy == nil {
 		return nil
 	}
-	return &deployment.Deployment{
+	return &external_deployments.Deployment{
 		ID:            ghDeploy.GetID(),
 		URL:           ghDeploy.GetURL(),
 		SHA:           ghDeploy.GetSHA(),
@@ -32,16 +32,16 @@ func toDeployment(ghDeploy *github.Deployment) *deployment.Deployment {
 	}
 }
 
-func toDeployments(ghDeployments []*github.Deployment) []*deployment.Deployment {
-	deployments := make([]*deployment.Deployment, len(ghDeployments))
+func toDeployments(ghDeployments []*github.Deployment) []*external_deployments.Deployment {
+	deployments := make([]*external_deployments.Deployment, len(ghDeployments))
 	for i, d := range ghDeployments {
 		deployments[i] = toDeployment(d)
 	}
 	return deployments
 }
 
-func toCommit(commit *github.RepositoryCommit) *deployment.Commit {
-	return &deployment.Commit{
+func toCommit(commit *github.RepositoryCommit) *external_deployments.Commit {
+	return &external_deployments.Commit{
 		SHA:   commit.GetSHA(), // sha somehow stored in commit, not commit.Commit
 		Title: ParseCommitTitle(commit.Commit.GetMessage()),
 		URL:   commit.Commit.GetURL(),

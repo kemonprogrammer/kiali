@@ -1089,7 +1089,7 @@ func NewRoutes(
 			log.MetricsLogName,
 			"GET",
 			"/api/namespaces/{namespace}/workloads/{workload}/deployments",
-			handlers.WorkloadDeployments(conf, kialiCache, clientFactory, discovery, prom, grafana),
+			handlers.WorkloadDeployments(conf, kialiCache, clientFactory, discovery),
 			true,
 		},
 		// swagger:route GET /namespaces/{namespace}/ztunnel/{workload}/dashboard workloads ztunnelDashboard

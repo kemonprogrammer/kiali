@@ -1,4 +1,4 @@
-package deployment
+package external_deployments
 
 import (
 	"fmt"

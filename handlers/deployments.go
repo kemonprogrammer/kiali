@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -13,13 +12,11 @@ import (
 
 	"github.com/kiali/kiali/cache"
 	"github.com/kiali/kiali/config"
-	"github.com/kiali/kiali/deployment"
-	"github.com/kiali/kiali/deployment/gh"
-	"github.com/kiali/kiali/grafana"
+	"github.com/kiali/kiali/external_deployments"
+	"github.com/kiali/kiali/external_deployments/gh"
 	"github.com/kiali/kiali/istio"
 	"github.com/kiali/kiali/kubernetes"
 	"github.com/kiali/kiali/models"
-	"github.com/kiali/kiali/prometheus"
 )
 
 // todo move To models/deployments.go or include in models.metrics
@@ -29,7 +26,7 @@ type DeploymentsQuery struct {
 }
 
 type DeploymentResponse struct {
-	Deployments []*deployment.Deployment `json:"deployments"`
+	Deployments []*external_deployments.Deployment `json:"deployments"`
 }
 
 // WorkloadDeployments is the API handler to fetch GitHub deployments, related to a single workload
@@ -38,18 +35,28 @@ func WorkloadDeployments(
 	cache cache.KialiCache,
 	clientFactory kubernetes.ClientFactory,
 	discovery istio.MeshDiscovery,
-	prom prometheus.ClientInterface,
-	grafana *grafana.Service,
+	extDeploysClientLoader func() external_deployments.ClientInterface,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		namespace := vars["namespace"]
+		workload := vars["workload"]
+		cluster := clusterNameFromQuery(conf, r.URL.Query())
 
-		// todo get from config
-		owner := os.Getenv("OWNER")
-		repo := "github-go-client"
-		githubPat := os.Getenv("GITHUB_PAT")
-		env := os.Getenv("ENVIRONMENT")
+		// todo refactor: read config at the same location as for tracing
+		githubPat := conf.ExternalServices.ExternalDeployments.Auth.Token.String()
+		env := conf.ExternalServices.ExternalDeployments.Environment
 		ctx := context.Background()
 		client := github.NewClient(nil).WithAuthToken(githubPat)
+
+		var owner string
+		user, _, err := client.Users.Get(context.Background(), "")
+		if err == nil {
+			owner = *user.Login
+		}
+
+		// todo get from workload
+		repo := "github-go-client"
 
 		// todo move to server.go
 		ghRepo, err := gh.NewGithubRepository(client, owner, repo, env)
@@ -65,11 +72,6 @@ func WorkloadDeployments(
 		}
 
 		// todo end
-
-		vars := mux.Vars(r)
-		namespace := vars["namespace"]
-		workload := vars["workload"]
-		cluster := clusterNameFromQuery(conf, r.URL.Query())
 
 		// todo check what this does
 		_, err = checkNamespaceAccess(w, r, conf, cache, discovery, clientFactory, namespace, cluster)
@@ -94,7 +96,6 @@ func WorkloadDeployments(
 
 		response := &DeploymentResponse{Deployments: deployments}
 		fmt.Printf("response %+v\n", response) // todo remove
-		//RespondWithJSON(w, http.StatusOK, &deployments)
 		RespondWithJSON(w, http.StatusOK, response)
 
 		// -- OTHER HANDLER CODE --

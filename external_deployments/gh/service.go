@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v81/github"
-
-	"github.com/kiali/kiali/deployment"
+	"github.com/kiali/kiali/external_deployments"
 )
 
 type Service struct {
@@ -24,7 +23,7 @@ func NewService(repo Repository) (*Service, error) {
 	}, nil
 }
 
-func (gs *Service) ListDeployments(ctx context.Context) ([]*deployment.Deployment, error) {
+func (gs *Service) ListDeployments(ctx context.Context) ([]*external_deployments.Deployment, error) {
 	ghDeployments, err := gs.loadDeployments(ctx)
 	if err != nil {
 		return nil, err
@@ -32,7 +31,7 @@ func (gs *Service) ListDeployments(ctx context.Context) ([]*deployment.Deploymen
 	return toDeployments(ghDeployments), nil
 }
 
-func (gs *Service) ListDeploymentsInRange(ctx context.Context, from, to time.Time) ([]*deployment.Deployment, error) {
+func (gs *Service) ListDeploymentsInRange(ctx context.Context, from, to time.Time) ([]*external_deployments.Deployment, error) {
 	ghDeployments, err := gs.loadDeployments(ctx)
 	if err != nil {
 		return nil, err
@@ -80,7 +79,7 @@ func (gs *Service) loadDeployments(ctx context.Context) ([]*github.Deployment, e
 // todo repeat load previous Deployments until index = -1
 // if none other don't add it (means that this is the first deployment)
 func (gs *Service) findLatestSuccessfulBefore(
-	ctx context.Context, deploys []*deployment.Deployment, from time.Time) (*deployment.Deployment, error) {
+	ctx context.Context, deploys []*external_deployments.Deployment, from time.Time) (*external_deployments.Deployment, error) {
 
 	prevDeploys := filterTimerange(deploys, from.Add(-time.Duration(24)*time.Hour), from)
 	index := -1
@@ -103,7 +102,7 @@ func (gs *Service) findLatestSuccessfulBefore(
 	return prevDeploys[index], nil
 }
 
-func (gs *Service) fillWithCommits(ctx context.Context, deployments []*deployment.Deployment) ([]*deployment.Deployment, error) {
+func (gs *Service) fillWithCommits(ctx context.Context, deployments []*external_deployments.Deployment) ([]*external_deployments.Deployment, error) {
 	if len(deployments) < 2 {
 		return deployments, nil
 	}
@@ -148,8 +147,8 @@ func (gs *Service) fillWithCommits(ctx context.Context, deployments []*deploymen
 	return deployments, nil
 }
 
-func (gs *Service) filterSuccessful(ctx context.Context, deployments []*deployment.Deployment) ([]*deployment.Deployment, error) {
-	successful := make([]*deployment.Deployment, 0, len(deployments))
+func (gs *Service) filterSuccessful(ctx context.Context, deployments []*external_deployments.Deployment) ([]*external_deployments.Deployment, error) {
+	successful := make([]*external_deployments.Deployment, 0, len(deployments))
 
 	for _, d := range deployments {
 		statuses, err := gs.repo.ListDeploymentStatuses(ctx, d.ID, &github.ListOptions{
@@ -169,8 +168,8 @@ func (gs *Service) filterSuccessful(ctx context.Context, deployments []*deployme
 	return successful, nil
 }
 
-func filterTimerange(deployments []*deployment.Deployment, from time.Time, to time.Time) []*deployment.Deployment {
-	filtered := make([]*deployment.Deployment, 0, len(deployments))
+func filterTimerange(deployments []*external_deployments.Deployment, from time.Time, to time.Time) []*external_deployments.Deployment {
+	filtered := make([]*external_deployments.Deployment, 0, len(deployments))
 	for _, d := range deployments {
 		if d.CreatedAt.After(from) && d.CreatedAt.Before(to) {
 			filtered = append(filtered, d)

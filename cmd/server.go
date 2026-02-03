@@ -113,6 +113,19 @@ func run(ctx context.Context, conf *config.Config, staticAssetFS fs.FS, clientFa
 		log.Debug("Tracing is disabled")
 	}
 
+	if conf.ExternalServices.Tracing.Enabled {
+		go func() {
+			client, err := tracing.NewClient(ctx, conf, clientFactory.GetSAHomeClusterClient().GetToken(), true)
+			if err != nil {
+				log.Fatalf("Error creating tracing client: %s", err)
+				return
+			}
+			tracingClient = client
+		}()
+	} else {
+		log.Debug("Tracing is disabled")
+	}
+
 	grafana := grafana.NewService(conf, clientFactory.GetSAHomeClusterClient())
 
 	// Needs to be started after the server so that the cache is started because the controllers use the cache.

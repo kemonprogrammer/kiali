@@ -24,17 +24,20 @@ import (
 // Files found in /kiali-override-secrets that override the ConfigMap yaml values
 const (
 	// External services auth
-	SecretFileGrafanaUsername    = "grafana-username"
-	SecretFileGrafanaPassword    = "grafana-password"
-	SecretFileGrafanaToken       = "grafana-token"
-	SecretFilePersesUsername     = "perses-username"
-	SecretFilePersesPassword     = "perses-password"
-	SecretFilePrometheusUsername = "prometheus-username"
-	SecretFilePrometheusPassword = "prometheus-password"
-	SecretFilePrometheusToken    = "prometheus-token"
-	SecretFileTracingUsername    = "tracing-username"
-	SecretFileTracingPassword    = "tracing-password"
-	SecretFileTracingToken       = "tracing-token"
+	SecretFileGrafanaUsername             = "grafana-username"
+	SecretFileGrafanaPassword             = "grafana-password"
+	SecretFileGrafanaToken                = "grafana-token"
+	SecretFilePersesUsername              = "perses-username"
+	SecretFilePersesPassword              = "perses-password"
+	SecretFilePrometheusUsername          = "prometheus-username"
+	SecretFilePrometheusPassword          = "prometheus-password"
+	SecretFilePrometheusToken             = "prometheus-token"
+	SecretFileTracingUsername             = "tracing-username"
+	SecretFileTracingPassword             = "tracing-password"
+	SecretFileTracingToken                = "tracing-token"
+	SecretFileExternalDeploymentsUsername = "external-deployments-username"
+	SecretFileExternalDeploymentsPassword = "external-deployments-password"
+	SecretFileExternalDeploymentsToken    = "external-deployments-token"
 
 	// External services auth for custom dashboards
 	SecretFileCustomDashboardsPrometheusUsername = "customdashboards-prometheus-username"
@@ -49,6 +52,8 @@ const (
 	SecretFileGrafanaKey                     = "grafana-key"
 	SecretFileTracingCert                    = "tracing-cert"
 	SecretFileTracingKey                     = "tracing-key"
+	SecretFileExternalDeploymentsCert        = "external-deployments-cert"
+	SecretFileExternalDeploymentsKey         = "external-deployments-key"
 	SecretFilePersesCert                     = "perses-cert"
 	SecretFilePersesKey                      = "perses-key"
 	SecretFileCustomDashboardsPrometheusCert = "customdashboards-prometheus-cert"
@@ -191,6 +196,12 @@ type TracingCollectorType string
 
 const (
 	OTELCollectorType TracingCollectorType = "otel"
+)
+
+type ExternalDeploymentsProvider string
+
+const (
+	GithubProvider ExternalDeploymentsProvider = "github"
 )
 
 var validPathRegEx = regexp.MustCompile(`^\/[a-zA-Z0-9\-\._~!\$&\'()\*\+\,;=:@%/]*$`)
@@ -422,6 +433,18 @@ type TracingConfig struct {
 	XURL                 string            `yaml:"url,omitempty" json:"URL,omitempty"`                     // DEPRECATED!
 }
 
+// ExternalDeploymentsConfig adds version control information from external deployments
+type ExternalDeploymentsConfig struct {
+	Auth           Auth                        `yaml:"auth" json:"auth"`
+	Enabled        bool                        `yaml:"enabled" json:"enabled"`
+	Environment    string                      `yaml:"environment" json:"environment"`
+	ExternalURL    string                      `yaml:"external_url" json:"externalURL"`
+	HealthCheckUrl string                      `yaml:"health_check_url,omitempty" json:"healthCheckUrl,omitempty"`
+	IsCore         bool                        `yaml:"is_core,omitempty" json:"isCore,omitempty"`
+	Provider       ExternalDeploymentsProvider `yaml:"provider,omitempty" json:"provider,omitempty"`
+	XURL           string                      `yaml:"url,omitempty" json:"URL,omitempty"` // DEPRECATED!
+}
+
 // IstioConfig describes configuration used for istio links.
 // IMPORTANT: Values set here MUST apply to ALL Istio control planes being monitored by the Kiali
 //
@@ -465,12 +488,13 @@ type GatewayAPIClass struct {
 
 // ExternalServices holds configurations for other systems that Kiali depends on
 type ExternalServices struct {
-	Grafana          GrafanaConfig          `yaml:"grafana,omitempty"`
-	Istio            IstioConfig            `yaml:"istio,omitempty"`
-	Perses           PersesConfig           `yaml:"perses,omitempty"`
-	Prometheus       PrometheusConfig       `yaml:"prometheus,omitempty"`
-	CustomDashboards CustomDashboardsConfig `yaml:"custom_dashboards,omitempty"`
-	Tracing          TracingConfig          `yaml:"tracing,omitempty"`
+	Grafana             GrafanaConfig             `yaml:"grafana,omitempty"`
+	Istio               IstioConfig               `yaml:"istio,omitempty"`
+	Perses              PersesConfig              `yaml:"perses,omitempty"`
+	Prometheus          PrometheusConfig          `yaml:"prometheus,omitempty"`
+	CustomDashboards    CustomDashboardsConfig    `yaml:"custom_dashboards,omitempty"`
+	Tracing             TracingConfig             `yaml:"tracing,omitempty"`
+	ExternalDeployments ExternalDeploymentsConfig `yaml:"external_deployments,omitempty"`
 }
 
 // LoginToken holds config used for generating the Kiali session tokens.
@@ -1061,6 +1085,18 @@ func NewConfig() (c *Config) {
 				UseGRPC:              true,
 				WhiteListIstioSystem: []string{"jaeger-query", "istio-ingressgateway"},
 			},
+			ExternalDeployments: ExternalDeploymentsConfig{
+				Auth: Auth{
+					Type: AuthTypeNone,
+				},
+				Enabled:        false,
+				Environment:    "",
+				ExternalURL:    "",
+				HealthCheckUrl: "",
+				IsCore:         false,
+				Provider:       "",
+				XURL:           "",
+			},
 		},
 		IstioLabels: IstioLabels{
 			AmbientNamespaceLabel:       "istio.io/dataplane-mode",
@@ -1431,6 +1467,7 @@ func Set(conf *Config) {
 
 func (conf Config) Obfuscate() (obf Config) {
 	obf = conf
+	obf.ExternalServices.ExternalDeployments.Auth.Obfuscate()
 	obf.ExternalServices.Grafana.Auth.Obfuscate()
 	obf.ExternalServices.Perses.Auth.Obfuscate()
 	obf.ExternalServices.Prometheus.Auth.Obfuscate()
@@ -1624,6 +1661,27 @@ func Unmarshal(yamlString string) (conf *Config, err error) {
 		{
 			configValue: &conf.ExternalServices.Tracing.Auth.Username,
 			fileName:    SecretFileTracingUsername,
+		},
+		// External deployment credentials and certificates
+		{
+			configValue: &conf.ExternalServices.ExternalDeployments.Auth.CertFile,
+			fileName:    SecretFileExternalDeploymentsCert,
+		},
+		{
+			configValue: &conf.ExternalServices.ExternalDeployments.Auth.KeyFile,
+			fileName:    SecretFileExternalDeploymentsKey,
+		},
+		{
+			configValue: &conf.ExternalServices.ExternalDeployments.Auth.Password,
+			fileName:    SecretFileExternalDeploymentsPassword,
+		},
+		{
+			configValue: &conf.ExternalServices.ExternalDeployments.Auth.Token,
+			fileName:    SecretFileExternalDeploymentsToken,
+		},
+		{
+			configValue: &conf.ExternalServices.ExternalDeployments.Auth.Username,
+			fileName:    SecretFileExternalDeploymentsUsername,
 		},
 		// Perses credentials and certificates
 		{
@@ -1982,6 +2040,11 @@ func Validate(conf *Config) error {
 	cfgTracing := conf.ExternalServices.Tracing
 	if cfgTracing.Enabled && cfgTracing.Provider != JaegerProvider && cfgTracing.Provider != TempoProvider {
 		return fmt.Errorf("error in configuration options for the external services tracing provider. Invalid provider type [%s]", cfgTracing.Provider)
+	}
+
+	cfgExternalDeploys := conf.ExternalServices.ExternalDeployments
+	if cfgExternalDeploys.Enabled && cfgExternalDeploys.Provider != GithubProvider {
+		return fmt.Errorf("error in configuration options for the external services deployments provider. Invalid provider type [%s]", cfgTracing.Provider)
 	}
 
 	return nil
