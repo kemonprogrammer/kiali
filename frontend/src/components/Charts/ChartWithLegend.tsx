@@ -469,9 +469,6 @@ export class ChartWithLegend<T extends RichDataPoint, O extends LineInfo> extend
       );
     }, 0);
 
-    // const timeStamp = new Date(new Date().getTime() - 5 * 60 * 1000);
-    console.log({ deployments: this.props.deployments });
-
     return (
       <ChartGroup offset={groupOffset} height={height}>
         {/*todo display custom text on tooltip*/}
@@ -481,12 +478,18 @@ export class ChartWithLegend<T extends RichDataPoint, O extends LineInfo> extend
               {
                 x: new Date(deployment.created_at),
                 y: 0,
-                name: `Deployment ${deployment.id}`
+                name: `Deployment ${deployment.id}`,
+                unit: '',
+                y0: undefined,
+                deployment
               },
               {
                 x: new Date(deployment.created_at),
                 y: yMax,
-                name: `Deployment ${deployment.id}`
+                name: `Deployment ${deployment.id}`,
+                unit: '',
+                y0: undefined,
+                deployment
               }
             ];
             console.log({ data });

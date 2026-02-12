@@ -3,6 +3,7 @@ import { format as d3Format } from 'd3-format';
 import { getFormatter } from 'utils/Formatter';
 import { RichDataPoint } from 'types/VictoryChartInfo';
 import { VictoryVoronoiContainerProps } from 'victory-voronoi-container';
+import { Deployment } from '../../types/Deployments';
 
 type BrushDomain = { x: DomainTuple; y: DomainTuple };
 
@@ -63,6 +64,11 @@ export const getVoronoiContainerProps = (
         )}, ${formatValue('p75', obj.datum, obj.datum._q3)}`;
       }
 
+      if (obj.datum.childName.startsWith('Deployment')) {
+        const deployment = obj.datum.deployment;
+        return formatDeployment(deployment);
+      }
+
       return formatValue(obj.datum.name, obj.datum, obj.datum.y, obj.datum.y0);
     },
     labelComponent: labelComponent,
@@ -71,3 +77,17 @@ export const getVoronoiContainerProps = (
     voronoiBlacklist: ['parent']
   };
 };
+
+function formatDeployment(deployment: Deployment): string {
+  const parts = [`Deployment ${deployment.id}`, 'commits:'];
+
+  if (deployment.added?.length) {
+    parts.push(...deployment.added.map(a => `+ ${a.title}`));
+  }
+
+  if (deployment.removed?.length) {
+    parts.push(...deployment.removed.map(r => `- ${r.title}`));
+  }
+
+  return parts.join('\n');
+}
