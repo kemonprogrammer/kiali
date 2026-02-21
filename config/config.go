@@ -2044,7 +2044,7 @@ func Validate(conf *Config) error {
 
 	cfgExternalDeploys := conf.ExternalServices.ExternalDeployments
 	if cfgExternalDeploys.Enabled && cfgExternalDeploys.Provider != GithubProvider {
-		return fmt.Errorf("error in configuration options for the external services deployments provider. Invalid provider type [%s]", cfgTracing.Provider)
+		return fmt.Errorf("error in configuration options for the external services deployments provider. Invalid provider type [%s]", cfgExternalDeploys.Provider)
 	}
 
 	return nil
