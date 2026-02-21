@@ -35,7 +35,7 @@ func WorkloadDeployments(
 	cache cache.KialiCache,
 	clientFactory kubernetes.ClientFactory,
 	discovery istio.MeshDiscovery,
-	extDeploysClientLoader func() external_deployments.ClientInterface,
+	// extDeploysClientLoader func() external_deployments.ClientInterface,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
@@ -45,15 +45,21 @@ func WorkloadDeployments(
 
 		// todo refactor: read config at the same location as for tracing
 		githubPat := conf.ExternalServices.ExternalDeployments.Auth.Token.String()
+		fmt.Printf("Github PAT from config: %s\n", githubPat)
 		env := conf.ExternalServices.ExternalDeployments.Environment
 		ctx := context.Background()
+
 		client := github.NewClient(nil).WithAuthToken(githubPat)
 
-		var owner string
-		user, _, err := client.Users.Get(context.Background(), "")
-		if err == nil {
-			owner = *user.Login
+		owner := conf.ExternalServices.ExternalDeployments.Auth.Username.String()
+
+		if len(owner) == 0 {
+			RespondWithError(w, http.StatusBadRequest, "external_deployments.auth.username not set in config")
+			return
 		}
+
+		fmt.Printf("owner from config: %s\n", owner)
+		fmt.Printf("env from config: %s\n", env)
 
 		// todo get from workload
 		repo := "github-go-client"
@@ -65,7 +71,7 @@ func WorkloadDeployments(
 			return
 		}
 
-		deploymentService, err := gh.NewService(ghRepo)
+		deploymentService, err := gh.NewGithubDeploymentService(ghRepo)
 		if err != nil {
 			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
 			return

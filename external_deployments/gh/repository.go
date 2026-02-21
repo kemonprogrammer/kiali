@@ -8,52 +8,62 @@ import (
 )
 
 type Repository interface {
-	ListDeployments(ctx context.Context, opts *github.DeploymentsListOptions) ([]*github.Deployment, error)
+	ListDeployments(ctx context.Context, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error)
 	ListDeploymentStatuses(ctx context.Context, id int64, opts *github.ListOptions) ([]*github.DeploymentStatus, error)
 	CompareCommits(ctx context.Context, base, head string, opts *github.ListOptions) (*github.CommitsComparison, error)
 }
+
 type GithubRepository struct {
 	client                   *github.Client
-	repo, owner, environment string
+	name, owner, environment string
+	commitCache              map[compareKey]*github.CommitsComparison
 }
 
-func NewGithubRepository(client *github.Client, owner, repo, environment string) (Repository, error) {
+type compareKey struct {
+	Base string
+	Head string
+}
+
+func NewGithubRepository(client *github.Client, owner, name, environment string) (Repository, error) {
 	if client == nil {
-		return nil, fmt.Errorf("repo cannot be nil")
+		return nil, fmt.Errorf("github client cannot be nil")
 	}
 	return &GithubRepository{
 		client:      client,
 		owner:       owner,
-		repo:        repo,
+		name:        name,
 		environment: environment,
+		commitCache: make(map[compareKey]*github.CommitsComparison),
 	}, nil
 }
 
-func (gc *GithubRepository) ListDeployments(ctx context.Context, opts *github.DeploymentsListOptions) ([]*github.Deployment, error) {
-	if opts == nil {
-		opts = &github.DeploymentsListOptions{
-			Environment: gc.environment,
-			//SHA:         "",
-			//Ref:         "",
-			//Task:        "",
-			//ListOptions: github.ListOptions{}, // todo handle more than 30 ghDeployments (default)
-		}
+func (gc *GithubRepository) ListDeployments(ctx context.Context, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error) {
+	fmt.Printf("TRACE ListDeployments\n")
+	if opts.Environment == "" {
+		opts.Environment = gc.environment
 	}
-	deploys, _, err := gc.client.Repositories.ListDeployments(ctx, gc.owner, gc.repo, opts)
-	return deploys, err
+	deploys, resp, err := gc.client.Repositories.ListDeployments(ctx, gc.owner, gc.name, opts)
+	return deploys, resp, err
 }
 
 func (gc *GithubRepository) ListDeploymentStatuses(ctx context.Context, id int64, opts *github.ListOptions) ([]*github.DeploymentStatus, error) {
-	deploys, _, err := gc.client.Repositories.ListDeploymentStatuses(ctx, gc.owner, gc.repo, id, opts)
-	return deploys, err
+	fmt.Printf("TRACE ListDeploymentStatuses\n")
+	statuses, _, err := gc.client.Repositories.ListDeploymentStatuses(ctx, gc.owner, gc.name, id, opts)
+	return statuses, err
 }
 
 func (gc *GithubRepository) CompareCommits(ctx context.Context, base, head string, opts *github.ListOptions) (*github.CommitsComparison, error) {
-	if opts == nil {
-		opts = &github.ListOptions{
-			// todo handle more than 30 commits  (default) -> maybe "<first 7 commits> 24 more commits\n<compare-url>"
-		}
+	key := compareKey{Base: base, Head: head}
+	if res, found := gc.commitCache[key]; found {
+		return res, nil
 	}
-	deploys, _, err := gc.client.Repositories.CompareCommits(ctx, gc.owner, gc.repo, base, head, opts)
-	return deploys, err
+
+	fmt.Printf("TRACE CompareCommits\n")
+	commitCmp, _, err := gc.client.Repositories.CompareCommits(ctx, gc.owner, gc.name, base, head, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	gc.commitCache[key] = commitCmp
+	return commitCmp, err
 }

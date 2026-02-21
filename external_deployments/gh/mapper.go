@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/go-github/v81/github"
 
-	"github.com/kiali/kiali/deployment"
+	"github.com/kiali/kiali/external_deployments"
 )
 
 func toCommits(commitCmp *github.CommitsComparison) []*external_deployments.Commit {
@@ -27,8 +27,8 @@ func toDeployment(ghDeploy *github.Deployment) *external_deployments.Deployment 
 		CreatedAt:     ghDeploy.GetCreatedAt().Time,
 		UpdatedAt:     ghDeploy.GetUpdatedAt().Time,
 		ComparisonURL: "",
-		Added:         nil,
-		Removed:       nil,
+		Added:         make([]*external_deployments.Commit, 0),
+		Removed:       make([]*external_deployments.Commit, 0),
 	}
 }
 
