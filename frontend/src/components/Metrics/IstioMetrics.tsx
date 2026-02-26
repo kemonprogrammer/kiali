@@ -183,7 +183,6 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
 
   private refresh = (): void => {
     this.fetchMetrics();
-    this.fetchDeployments();
 
     if (this.state.showSpans) {
       this.spanOverlay.fetch({
@@ -197,15 +196,7 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
     }
 
     if (this.state.showDeployments) {
-      // todo fetch deployments from BE
-      // this.spanOverlay.fetch({
-      //   cluster: this.props.cluster,
-      //   limit: this.state.traceLimit,
-      //   namespace: this.props.namespace,
-      //   range: this.props.timeRange,
-      //   target: this.props.object,
-      //   targetKind: this.props.objectType
-      // });
+      this.fetchDeployments();
     }
   };
 
