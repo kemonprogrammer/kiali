@@ -9,24 +9,24 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/kiali/kiali/external_deployments/types"
 
 	"github.com/kiali/kiali/cache"
 	"github.com/kiali/kiali/config"
 	"github.com/kiali/kiali/external_deployments"
+	"github.com/kiali/kiali/external_deployments/model"
 	"github.com/kiali/kiali/istio"
 	"github.com/kiali/kiali/kubernetes"
 	"github.com/kiali/kiali/models"
 )
 
-// todo move To models/deployments.go or include in models.metrics
 type DeploymentsQuery struct {
 	From, To                     time.Time
 	Cluster, Namespace, Workload string
 }
 
 type DeploymentResponse struct {
-	Deployments []*types.Deployment `json:"deployments"`
+	Deployments []*model.Deployment `json:"deployments"`
+	Total       int                 `json:"total"`
 }
 
 // ExternalDeployments is the API handler to fetch GitHub deployments, related to a single workload
@@ -74,7 +74,6 @@ func ExternalDeployments(
 			fmt.Println(fmt.Errorf("no repository found for workload %s", workload))
 		}
 
-		// todo check what this does
 		_, err = checkNamespaceAccess(w, r, conf, cache, discovery, clientFactory, namespace, cluster)
 		if err != nil {
 			RespondWithError(w, http.StatusServiceUnavailable, err.Error())

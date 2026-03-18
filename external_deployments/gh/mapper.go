@@ -5,22 +5,22 @@ import (
 
 	"github.com/google/go-github/v81/github"
 
-	"github.com/kiali/kiali/external_deployments/types"
+	"github.com/kiali/kiali/external_deployments/model"
 )
 
-func toCommits(commitCmp *github.CommitsComparison) []*types.Commit {
-	commits := make([]*types.Commit, commitCmp.GetTotalCommits())
+func toCommits(commitCmp *github.CommitsComparison) []*model.Commit {
+	commits := make([]*model.Commit, commitCmp.GetTotalCommits())
 	for i, commit := range commitCmp.Commits {
 		commits[i] = toCommit(commit)
 	}
 	return commits
 }
 
-func toDeployment(ghDeploy *github.Deployment) *types.Deployment {
+func toDeployment(ghDeploy *github.Deployment) *model.Deployment {
 	if ghDeploy == nil {
 		return nil
 	}
-	return &types.Deployment{
+	return &model.Deployment{
 		ID:            ghDeploy.GetID(),
 		URL:           ghDeploy.GetURL(),
 		SHA:           ghDeploy.GetSHA(),
@@ -32,16 +32,16 @@ func toDeployment(ghDeploy *github.Deployment) *types.Deployment {
 	}
 }
 
-func toDeployments(ghDeployments []*github.Deployment) []*types.Deployment {
-	deployments := make([]*types.Deployment, len(ghDeployments))
+func toDeployments(ghDeployments []*github.Deployment) []*model.Deployment {
+	deployments := make([]*model.Deployment, len(ghDeployments))
 	for i, d := range ghDeployments {
 		deployments[i] = toDeployment(d)
 	}
 	return deployments
 }
 
-func toCommit(commit *github.RepositoryCommit) *types.Commit {
-	return &types.Commit{
+func toCommit(commit *github.RepositoryCommit) *model.Commit {
+	return &model.Commit{
 		SHA:   commit.GetSHA(), // sha somehow stored in commit, not commit.Commit
 		Title: ParseCommitTitle(commit.Commit.GetMessage()),
 		URL:   commit.Commit.GetURL(),

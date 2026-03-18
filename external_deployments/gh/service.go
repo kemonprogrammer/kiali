@@ -9,14 +9,14 @@ import (
 	"github.com/google/go-github/v81/github"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/kiali/kiali/external_deployments/types"
+	"github.com/kiali/kiali/external_deployments/model"
 )
 
 type GithubDeploymentService struct {
 	clientInterface       GithubClientInterface
 	repo                  string
 	ghDeployments         []*github.Deployment
-	successfulDeployments []*types.Deployment
+	successfulDeployments []*model.Deployment
 }
 
 func NewGithubDeploymentService(clientInterface GithubClientInterface, repo string) (*GithubDeploymentService, error) {
@@ -29,7 +29,7 @@ func NewGithubDeploymentService(clientInterface GithubClientInterface, repo stri
 	}, nil
 }
 
-func (gs *GithubDeploymentService) ListDeployments(ctx context.Context) ([]*types.Deployment, error) {
+func (gs *GithubDeploymentService) ListDeployments(ctx context.Context) ([]*model.Deployment, error) {
 	err := gs.loadDeployments(ctx)
 
 	if err != nil {
@@ -69,10 +69,10 @@ func (gs *GithubDeploymentService) loadSuccessfulDeploymentsInRange(ctx context.
 	possibleSuccessfulDeploys := filterTimerangeBySuccessPossible(allDeploys, from, to)
 
 	// only refresh success status if not already succeeded
-	newPossibleSuccessfulDeploys := make([]*types.Deployment, 0, len(possibleSuccessfulDeploys))
+	newPossibleSuccessfulDeploys := make([]*model.Deployment, 0, len(possibleSuccessfulDeploys))
 	for _, possibleDeploy := range possibleSuccessfulDeploys {
 
-		if !slices.ContainsFunc(gs.successfulDeployments, func(deploy *types.Deployment) bool {
+		if !slices.ContainsFunc(gs.successfulDeployments, func(deploy *model.Deployment) bool {
 			return deploy.ID == possibleDeploy.ID
 		}) {
 			newPossibleSuccessfulDeploys = append(newPossibleSuccessfulDeploys, possibleDeploy)
@@ -85,7 +85,7 @@ func (gs *GithubDeploymentService) loadSuccessfulDeploymentsInRange(ctx context.
 	}
 
 	newSuccessfulDeploys := append(gs.successfulDeployments, populated...)
-	slices.SortFunc(newSuccessfulDeploys, func(a, b *types.Deployment) int {
+	slices.SortFunc(newSuccessfulDeploys, func(a, b *model.Deployment) int {
 		return int(b.SucceededAt.Unix() - a.SucceededAt.Unix()) // assumption: running on 64-bit or higher architecture
 	})
 
@@ -94,7 +94,7 @@ func (gs *GithubDeploymentService) loadSuccessfulDeploymentsInRange(ctx context.
 }
 
 // ListDeploymentsInRange lists deployments with a deployment status successful in range [from, to]
-func (gs *GithubDeploymentService) ListDeploymentsInRange(ctx context.Context, from, to time.Time) ([]*types.Deployment, error) {
+func (gs *GithubDeploymentService) ListDeploymentsInRange(ctx context.Context, from, to time.Time) ([]*model.Deployment, error) {
 
 	err := gs.loadSuccessfulDeploymentsInRange(ctx, from, to)
 	if err != nil {
@@ -105,7 +105,7 @@ func (gs *GithubDeploymentService) ListDeploymentsInRange(ctx context.Context, f
 
 	inRange := filterTimerangeBySucceededAt(successful, from, to)
 
-	var oneBefore *types.Deployment
+	var oneBefore *model.Deployment
 	for _, sd := range gs.successfulDeployments {
 		if sd.SucceededAt.Before(from) {
 			oneBefore = sd
@@ -199,7 +199,7 @@ func (gs *GithubDeploymentService) loadDeployments(ctx context.Context) error {
 	return nil
 }
 
-func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, deployments []*types.Deployment) ([]*types.Deployment, error) {
+func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, deployments []*model.Deployment) ([]*model.Deployment, error) {
 	if len(deployments) <= 1 {
 		return deployments, nil
 	}
@@ -248,7 +248,7 @@ func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, depl
 				return fmt.Errorf("unexpected commit status: %s", status)
 			}
 
-			return nil // Return nil to signal success to the errgroup
+			return nil
 		})
 	}
 
@@ -257,16 +257,11 @@ func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, depl
 		return nil, err
 	}
 
-	// Sort the slice in place
-	slices.SortFunc(deployments, func(a, b *types.Deployment) int {
-		return int(b.SucceededAt.Unix() - a.SucceededAt.Unix())
-	})
-
 	return deployments, nil
 }
 
-func (gs *GithubDeploymentService) filterSuccessful(ctx context.Context, deployments []*types.Deployment) ([]*types.Deployment, error) {
-	successful := make([]*types.Deployment, 0, len(deployments))
+func (gs *GithubDeploymentService) filterSuccessful(ctx context.Context, deployments []*model.Deployment) ([]*model.Deployment, error) {
+	successful := make([]*model.Deployment, 0, len(deployments))
 
 	for _, d := range deployments {
 		statuses, err := gs.clientInterface.ListDeploymentStatuses(ctx, gs.repo, d.ID, &github.ListOptions{
@@ -286,8 +281,8 @@ func (gs *GithubDeploymentService) filterSuccessful(ctx context.Context, deploym
 	return successful, nil
 }
 
-func filterTimerangeBySucceededAt(deployments []*types.Deployment, from time.Time, to time.Time) []*types.Deployment {
-	filtered := make([]*types.Deployment, 0, len(deployments))
+func filterTimerangeBySucceededAt(deployments []*model.Deployment, from time.Time, to time.Time) []*model.Deployment {
+	filtered := make([]*model.Deployment, 0, len(deployments))
 	for _, d := range deployments {
 		if d.SucceededAt.After(from) && d.SucceededAt.Before(to) {
 			filtered = append(filtered, d)
@@ -297,8 +292,8 @@ func filterTimerangeBySucceededAt(deployments []*types.Deployment, from time.Tim
 }
 
 // filterTimerangeBySuccessPossible filters deployments which could have a succeeded in the timeframe
-func filterTimerangeBySuccessPossible(deployments []*types.Deployment, from time.Time, to time.Time) []*types.Deployment {
-	filtered := make([]*types.Deployment, 0, len(deployments))
+func filterTimerangeBySuccessPossible(deployments []*model.Deployment, from time.Time, to time.Time) []*model.Deployment {
+	filtered := make([]*model.Deployment, 0, len(deployments))
 	for _, d := range deployments {
 		if d.UpdatedAt.After(from) && d.CreatedAt.Before(to) {
 			filtered = append(filtered, d)
@@ -308,8 +303,8 @@ func filterTimerangeBySuccessPossible(deployments []*types.Deployment, from time
 }
 
 // populateSuccessStatus assumption: deployment status states: x -> success -> inactive
-func (gs *GithubDeploymentService) populateSuccessStatus(ctx context.Context, deploys []*types.Deployment) ([]*types.Deployment, error) {
-	successful := make([]*types.Deployment, 0, len(deploys))
+func (gs *GithubDeploymentService) populateSuccessStatus(ctx context.Context, deploys []*model.Deployment) ([]*model.Deployment, error) {
+	successful := make([]*model.Deployment, 0, len(deploys))
 
 	for _, d := range deploys {
 		// todo get all deployment statuses in case there is a next page

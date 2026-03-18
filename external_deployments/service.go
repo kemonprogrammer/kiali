@@ -7,11 +7,11 @@ import (
 
 	"github.com/kiali/kiali/config"
 	"github.com/kiali/kiali/external_deployments/gh"
-	"github.com/kiali/kiali/external_deployments/types"
+	"github.com/kiali/kiali/external_deployments/model"
 )
 
 type DeploymentService interface {
-	ListDeploymentsInRange(ctx context.Context, from, to time.Time) ([]*types.Deployment, error)
+	ListDeploymentsInRange(ctx context.Context, from, to time.Time) ([]*model.Deployment, error)
 	ValidateRepo(ctx context.Context) error
 }
 
