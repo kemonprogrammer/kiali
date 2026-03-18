@@ -1,4 +1,4 @@
-package external_deployments
+package types
 
 import (
 	"encoding/json"

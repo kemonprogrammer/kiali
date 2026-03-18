@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
-	"github.com/google/go-github/v81/github"
 	"github.com/gorilla/mux"
+	"github.com/kiali/kiali/external_deployments/types"
 
 	"github.com/kiali/kiali/cache"
 	"github.com/kiali/kiali/config"
 	"github.com/kiali/kiali/external_deployments"
-	"github.com/kiali/kiali/external_deployments/gh"
 	"github.com/kiali/kiali/istio"
 	"github.com/kiali/kiali/kubernetes"
 	"github.com/kiali/kiali/models"
@@ -26,58 +26,53 @@ type DeploymentsQuery struct {
 }
 
 type DeploymentResponse struct {
-	Deployments []*external_deployments.Deployment `json:"deployments"`
+	Deployments []*types.Deployment `json:"deployments"`
 }
 
-// WorkloadDeployments is the API handler to fetch GitHub deployments, related to a single workload
-func WorkloadDeployments(
+// ExternalDeployments is the API handler to fetch GitHub deployments, related to a single workload
+func ExternalDeployments(
 	conf *config.Config,
 	cache cache.KialiCache,
 	clientFactory kubernetes.ClientFactory,
 	discovery istio.MeshDiscovery,
-	// extDeploysClientLoader func() external_deployments.ClientInterface,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		namespace := vars["namespace"]
 		workload := vars["workload"]
-		cluster := clusterNameFromQuery(conf, r.URL.Query())
+		if len(workload) == 0 {
+			workload = vars["app"]
+		}
+		if len(workload) == 0 {
+			workload = vars["service"]
+		}
+		if len(workload) == 0 {
+			RespondWithError(w, http.StatusBadRequest, "No workload provided!")
+			return
+		}
 
-		// todo refactor: read config at the same location as for tracing
-		githubPat := conf.ExternalServices.ExternalDeployments.Auth.Token.String()
-		fmt.Printf("Github PAT from config: %s\n", githubPat)
-		env := conf.ExternalServices.ExternalDeployments.Environment
+		cluster := clusterNameFromQuery(conf, r.URL.Query())
 		ctx := context.Background()
 
-		client := github.NewClient(nil).WithAuthToken(githubPat)
-
 		owner := conf.ExternalServices.ExternalDeployments.Auth.Username.String()
-
 		if len(owner) == 0 {
 			RespondWithError(w, http.StatusBadRequest, "external_deployments.auth.username not set in config")
 			return
 		}
 
-		fmt.Printf("owner from config: %s\n", owner)
-		fmt.Printf("env from config: %s\n", env)
+		repo := extractRepoName(workload)
 
-		// todo get from workload
-		repo := "github-go-client"
-
-		// todo move to server.go
-		ghRepo, err := gh.NewGithubRepository(client, owner, repo, env)
+		deploymentService, err := external_deployments.NewDeploymentService(conf, repo)
 		if err != nil {
-			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
+			RespondWithError(w, http.StatusServiceUnavailable, "could not set up external deployments")
 			return
 		}
 
-		deploymentService, err := gh.NewGithubDeploymentService(ghRepo)
-		if err != nil {
-			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
-			return
+		// params
+		if err := deploymentService.ValidateRepo(ctx); err != nil {
+			fmt.Println(err)
+			fmt.Println(fmt.Errorf("no repository found for workload %s", workload))
 		}
-
-		// todo end
 
 		// todo check what this does
 		_, err = checkNamespaceAccess(w, r, conf, cache, discovery, clientFactory, namespace, cluster)
@@ -104,21 +99,6 @@ func WorkloadDeployments(
 		fmt.Printf("response %+v\n", response) // todo remove
 		RespondWithJSON(w, http.StatusOK, response)
 
-		// -- OTHER HANDLER CODE --
-
-		//if err := extractIstioMetricsQueryParams(r, &params, namespaceInfo); err != nil {
-		//	RespondWithError(w, http.StatusBadRequest, err.Error())
-		//	return
-		//}
-		//
-		//metricsService := business.NewMetricsService(prom, conf)
-		//metrics, err := metricsService.GetMetrics(r.Context(), params, business.GetIstioScaler())
-		//if err != nil {
-		//	RespondWithError(w, http.StatusServiceUnavailable, err.Error())
-		//	return
-		//}
-		//dashboard := business.NewDashboardsService(conf, grafana, prom, namespaceInfo, nil).BuildIstioDashboard(metrics, params.Direction)
-		//RespondWithJSON(w, http.StatusOK, dashboard)
 	}
 }
 
@@ -144,4 +124,19 @@ func extractDeploymentQueryParams(r *http.Request, query *DeploymentsQuery, name
 	}
 
 	return nil
+}
+
+func extractRepoName(workload string) string {
+	regexStr := "-v\\d.*"
+	r, err := regexp.Compile(regexStr)
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	match, _ := regexp.MatchString(regexStr, workload)
+	repoName := workload
+	if match {
+		repoName = r.ReplaceAllString(workload, "")
+	}
+	return repoName
 }
