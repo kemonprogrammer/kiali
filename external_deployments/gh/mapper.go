@@ -22,13 +22,12 @@ func toDeployment(ghDeploy *github.Deployment) *model.Deployment {
 	}
 	return &model.Deployment{
 		ID:            ghDeploy.GetID(),
-		URL:           ghDeploy.GetURL(),
 		SHA:           ghDeploy.GetSHA(),
 		CreatedAt:     ghDeploy.GetCreatedAt().Time,
 		UpdatedAt:     ghDeploy.GetUpdatedAt().Time,
 		ComparisonURL: "",
-		Added:         nil,
-		Removed:       nil,
+		Added:         []*model.Commit{},
+		Removed:       []*model.Commit{},
 	}
 }
 
@@ -44,7 +43,7 @@ func toCommit(commit *github.RepositoryCommit) *model.Commit {
 	return &model.Commit{
 		SHA:   commit.GetSHA(), // sha somehow stored in commit, not commit.Commit
 		Title: ParseCommitTitle(commit.Commit.GetMessage()),
-		URL:   commit.Commit.GetURL(),
+		URL:   commit.GetHTMLURL(),
 	}
 }
 

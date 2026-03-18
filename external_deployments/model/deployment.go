@@ -10,7 +10,6 @@ import (
 type Deployment struct {
 	// deployment
 	ID          int64     `json:"id"`
-	URL         string    `json:"url"`
 	SHA         string    `json:"sha"`
 	CreatedAt   time.Time `json:"created_at,omitempty"`
 	UpdatedAt   time.Time `json:"updated_at,omitempty"`
@@ -26,7 +25,6 @@ type Deployment struct {
 type shadowDeployment struct {
 	// deployment
 	ID          int64      `json:"id"`
-	URL         string     `json:"url"`
 	SHA         string     `json:"sha"`
 	CreatedAt   *time.Time `json:"created_at,omitempty"`
 	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
@@ -48,9 +46,8 @@ func (d Deployment) String() string {
 	}
 
 	return fmt.Sprintf(
-		"Deployment(\n id: %d,\n deployUrl: %s,\n sha: %q,\n created: %v,\n updated: %v,\n succeeded: %v,\n comparison URL: %s,\n commits: \n%s)\n",
+		"Deployment(\n id: %d,\n sha: %q,\n created: %v,\n updated: %v,\n succeeded: %v,\n comparison URL: %s,\n commits: \n%s)\n",
 		d.ID,
-		d.URL,
 		d.SHA,
 		formatTime(d.CreatedAt),
 		formatTime(d.UpdatedAt),
@@ -70,7 +67,6 @@ func formatTime(t time.Time) *time.Time {
 func (d Deployment) MarshalJSON() ([]byte, error) {
 	sd := shadowDeployment{
 		ID:            d.ID,
-		URL:           d.URL,
 		SHA:           d.SHA,
 		CreatedAt:     formatTime(d.CreatedAt),
 		UpdatedAt:     formatTime(d.UpdatedAt),

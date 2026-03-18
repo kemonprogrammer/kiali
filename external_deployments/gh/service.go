@@ -248,7 +248,7 @@ func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, depl
 				return fmt.Errorf("unexpected commit status: %s", status)
 			}
 
-			return nil
+			return nil // Return nil to signal success to the errgroup
 		})
 	}
 
@@ -256,6 +256,11 @@ func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, depl
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
+
+	// Sort the slice in place
+	slices.SortFunc(deployments, func(a, b *model.Deployment) int {
+		return int(b.SucceededAt.Unix() - a.SucceededAt.Unix())
+	})
 
 	return deployments, nil
 }
