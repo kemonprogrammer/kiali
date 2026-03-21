@@ -3,17 +3,19 @@ package gh
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/go-github/v81/github"
 
 	"github.com/kiali/kiali/config"
+	"github.com/kiali/kiali/log"
 )
 
 // GithubClientInterface mock for testing
 type GithubClientInterface interface {
 	GetRepository(ctx context.Context, repoName string) (*github.Repository, *github.Response, error)
 	ListDeployments(ctx context.Context, repoName string, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error)
-	ListDeploymentStatuses(ctx context.Context, repoName string, id int64, opts *github.ListOptions) ([]*github.DeploymentStatus, error)
+	ListDeploymentStatuses(ctx context.Context, repoName string, id int64, opts *github.ListOptions) ([]*github.DeploymentStatus, *github.Response, error)
 	CompareCommits(ctx context.Context, repoName, base, head string, opts *github.ListOptions) (*github.CommitsComparison, error)
 }
 
@@ -60,6 +62,10 @@ func NewGithubClient(client *github.Client, owner, environment string) (GithubCl
 }
 
 func (gc *GithubClient) GetRepository(ctx context.Context, repoName string) (*github.Repository, *github.Response, error) {
+	start := time.Now()
+	defer func() {
+		log.Tracef("getRepository took %v\n", time.Since(start))
+	}()
 	repo, resp, err := gc.client.Repositories.Get(ctx, gc.owner, repoName)
 	if err != nil {
 		return nil, nil, err
@@ -68,7 +74,11 @@ func (gc *GithubClient) GetRepository(ctx context.Context, repoName string) (*gi
 }
 
 func (gc *GithubClient) ListDeployments(ctx context.Context, repoName string, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error) {
-	fmt.Printf("TRACE ListDeployments\n")
+	start := time.Now()
+	defer func() {
+		log.Tracef("")
+		log.Tracef("listDeployments took %v\n", time.Since(start))
+	}()
 	if opts.Environment == "" {
 		opts.Environment = gc.environment
 	}
@@ -76,14 +86,20 @@ func (gc *GithubClient) ListDeployments(ctx context.Context, repoName string, op
 	return deploys, resp, err
 }
 
-func (gc *GithubClient) ListDeploymentStatuses(ctx context.Context, repoName string, id int64, opts *github.ListOptions) ([]*github.DeploymentStatus, error) {
-	fmt.Printf("TRACE ListDeploymentStatuses\n")
-	statuses, _, err := gc.client.Repositories.ListDeploymentStatuses(ctx, gc.owner, repoName, id, opts)
-	return statuses, err
+func (gc *GithubClient) ListDeploymentStatuses(ctx context.Context, repoName string, id int64, opts *github.ListOptions) ([]*github.DeploymentStatus, *github.Response, error) {
+	start := time.Now()
+	defer func() {
+		log.Tracef("listDeploymentStatuses took %v\n", time.Since(start))
+	}()
+	statuses, resp, err := gc.client.Repositories.ListDeploymentStatuses(ctx, gc.owner, repoName, id, opts)
+	return statuses, resp, err
 }
 
 func (gc *GithubClient) CompareCommits(ctx context.Context, repoName, base, head string, opts *github.ListOptions) (*github.CommitsComparison, error) {
-	fmt.Printf("TRACE CompareCommits\n")
+	start := time.Now()
+	defer func() {
+		log.Tracef("compareCommits took %v\n", time.Since(start))
+	}()
 	commitCmp, _, err := gc.client.Repositories.CompareCommits(ctx, gc.owner, repoName, base, head, opts)
 	if err != nil {
 		return nil, err

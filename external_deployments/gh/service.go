@@ -3,7 +3,9 @@ package gh
 import (
 	"context"
 	"fmt"
+	"log"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v81/github"
@@ -101,7 +103,6 @@ func (gs *GithubDeploymentService) ListDeploymentsInRange(ctx context.Context, f
 		return nil, err
 	}
 	successful := gs.successfulDeployments
-	fmt.Printf("successful: %d\n", len(successful))
 
 	inRange := filterTimerangeBySucceededAt(successful, from, to)
 
@@ -113,7 +114,11 @@ func (gs *GithubDeploymentService) ListDeploymentsInRange(ctx context.Context, f
 		}
 	}
 
-	populated, err := gs.populateWithCommits(ctx, append(inRange, oneBefore))
+	if oneBefore != nil {
+		inRange = append(inRange, oneBefore)
+	}
+
+	populated, err := gs.populateWithCommits(ctx, inRange)
 	if err != nil {
 		return nil, err
 	}
@@ -206,6 +211,7 @@ func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, depl
 
 	// Create an errgroup with a derived context that cancels if any goroutine errors out.
 	g, gCtx := errgroup.WithContext(ctx)
+	start := time.Now()
 
 	for i := range len(deployments) - 1 {
 
@@ -256,6 +262,7 @@ func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, depl
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
+	log.Printf("TRACE comparing %d times took %v\n", len(deployments)-1, time.Since(start))
 
 	// Sort the slice in place
 	slices.SortFunc(deployments, func(a, b *model.Deployment) int {
@@ -263,27 +270,6 @@ func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, depl
 	})
 
 	return deployments, nil
-}
-
-func (gs *GithubDeploymentService) filterSuccessful(ctx context.Context, deployments []*model.Deployment) ([]*model.Deployment, error) {
-	successful := make([]*model.Deployment, 0, len(deployments))
-
-	for _, d := range deployments {
-		statuses, err := gs.clientInterface.ListDeploymentStatuses(ctx, gs.repo, d.ID, &github.ListOptions{
-			PerPage: 10,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get deployment statuses for %d: %w", d.ID, err)
-		}
-
-		for _, status := range statuses {
-			if status.GetState() == "success" {
-				successful = append(successful, d)
-				break
-			}
-		}
-	}
-	return successful, nil
 }
 
 func filterTimerangeBySucceededAt(deployments []*model.Deployment, from time.Time, to time.Time) []*model.Deployment {
@@ -310,23 +296,48 @@ func filterTimerangeBySuccessPossible(deployments []*model.Deployment, from time
 // populateSuccessStatus assumption: deployment status states: x -> success -> inactive
 func (gs *GithubDeploymentService) populateSuccessStatus(ctx context.Context, deploys []*model.Deployment) ([]*model.Deployment, error) {
 	successful := make([]*model.Deployment, 0, len(deploys))
+	var mu sync.Mutex
+	g, gCtx := errgroup.WithContext(ctx)
+
+	start := time.Now()
 
 	for _, d := range deploys {
-		// todo get all deployment statuses in case there is a next page
-		statuses, err := gs.clientInterface.ListDeploymentStatuses(ctx, gs.repo, d.ID, &github.ListOptions{
-			PerPage: 30,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get deployment statuses for %d: %w", d.ID, err)
-		}
-
-		for _, status := range statuses {
-			if status.GetState() == "success" {
-				d.SucceededAt = status.GetUpdatedAt().Time
-				successful = append(successful, d)
-				break
+		g.Go(func() error {
+			opts := &github.ListOptions{
+				Page: 1,
 			}
-		}
+		out:
+			for opts.Page > 0 {
+				statuses, resp, err := gs.clientInterface.ListDeploymentStatuses(gCtx, gs.repo, d.ID, opts)
+				if err != nil {
+					return fmt.Errorf("failed to get deployment statuses for %d: %w", d.ID, err)
+				}
+				opts.Page = resp.NextPage
+
+				if resp.Rate.Remaining <= 10 {
+					return fmt.Errorf("rate limit nearly exhausted, only 10 calls remaining; resets at %v", resp.Rate.Reset)
+				}
+
+				for _, status := range statuses {
+					if status.GetState() == "success" {
+						d.SucceededAt = status.GetUpdatedAt().Time
+						mu.Lock()
+						successful = append(successful, d)
+						mu.Unlock()
+						break out
+					}
+				}
+			}
+			return nil
+		})
 	}
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+	log.Printf("TRACE loading success statuses took %v\n", time.Since(start))
+
+	slices.SortFunc(successful, func(a, b *model.Deployment) int {
+		return int(b.SucceededAt.Unix() - a.SucceededAt.Unix())
+	})
 	return successful, nil
 }
