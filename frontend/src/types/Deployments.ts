@@ -1,10 +1,6 @@
 export interface DeploymentsModel {
   deployments: Deployment[];
-  // aggregations: AggregationModel[];
-  // charts: ChartModel[];
-  // externalLinks: ExternalLink[];
-  // rows: number;
-  // title: string;
+  total: number;
 }
 
 export type Deployment = {
@@ -14,6 +10,7 @@ export type Deployment = {
   id: number;
   removed?: Commit[];
   sha: string;
+  succeeded_at: Date;
   updated_at: Date;
 };
 

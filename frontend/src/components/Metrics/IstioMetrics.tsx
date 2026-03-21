@@ -256,8 +256,6 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
         this.setState({
           deployments: response.data.deployments
         });
-        // todo remove
-        console.log({ deploymentsResponse: response.data.deployments });
       })
       .catch(error => {
         addError('Could not fetch metrics.', error);

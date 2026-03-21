@@ -471,7 +471,6 @@ export class ChartWithLegend<T extends RichDataPoint, O extends LineInfo> extend
 
     return (
       <ChartGroup offset={groupOffset} height={height}>
-        {/*todo display custom text on tooltip*/}
         {this.props.showDeployments &&
           this.props.deployments?.map(deployment => {
             const data = [
@@ -492,7 +491,6 @@ export class ChartWithLegend<T extends RichDataPoint, O extends LineInfo> extend
                 deployment
               }
             ];
-            console.log({ data });
             return (
               <ChartLine
                 {...{
