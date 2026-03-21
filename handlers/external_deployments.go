@@ -16,6 +16,7 @@ import (
 	"github.com/kiali/kiali/external_deployments/model"
 	"github.com/kiali/kiali/istio"
 	"github.com/kiali/kiali/kubernetes"
+	"github.com/kiali/kiali/log"
 	"github.com/kiali/kiali/models"
 )
 
@@ -70,8 +71,8 @@ func ExternalDeployments(
 
 		// params
 		if err := deploymentService.ValidateRepo(ctx); err != nil {
-			fmt.Println(err)
-			fmt.Println(fmt.Errorf("no repository found for workload %s", workload))
+			RespondWithError(w, http.StatusServiceUnavailable, fmt.Sprintf("no repository found for workload %s %s", workload, err))
+			return
 		}
 
 		_, err = checkNamespaceAccess(w, r, conf, cache, discovery, clientFactory, namespace, cluster)
@@ -79,7 +80,6 @@ func ExternalDeployments(
 			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
 			return
 		}
-		//models.IstioMetricsQuery{}
 		params := DeploymentsQuery{Cluster: cluster, Namespace: namespace, Workload: workload}
 
 		if err := extractDeploymentQueryParams(r, &params, nil); err != nil {
@@ -88,16 +88,18 @@ func ExternalDeployments(
 		}
 
 		deployments, err := deploymentService.ListDeploymentsInRange(ctx, params.From, params.To)
-		fmt.Printf("deployments %+v\n", deployments) // todo remove
+		log.Tracef("deployments %+v\n", deployments)
 		if err != nil {
 			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
 			return
 		}
 
-		response := &DeploymentResponse{Deployments: deployments}
-		fmt.Printf("response %+v\n", response) // todo remove
+		response := &DeploymentResponse{
+			Deployments: deployments,
+			Total:       len(deployments),
+		}
+		log.Tracef("response %+v\n", response)
 		RespondWithJSON(w, http.StatusOK, response)
-
 	}
 }
 
@@ -129,7 +131,7 @@ func extractRepoName(workload string) string {
 	regexStr := "-v\\d.*"
 	r, err := regexp.Compile(regexStr)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		return ""
 	}
 	match, _ := regexp.MatchString(regexStr, workload)

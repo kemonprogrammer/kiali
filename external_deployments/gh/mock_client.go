@@ -3,6 +3,9 @@ package gh
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/go-github/v81/github"
@@ -37,10 +40,13 @@ func (gc *MockGithubClient) GetRepository(_ context.Context, repoName string) (*
 func (gc *MockGithubClient) ListDeployments(_ context.Context, _ string, _ *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error) {
 	time.Sleep(400 * time.Millisecond)
 
-	length := 1000
+	length := 100
+	if val, err := strconv.Atoi(os.Getenv("MOCK_DEPLOYMENTS_LENGTH")); err == nil {
+		length = val
+	}
 	deploys := make([]*github.Deployment, 0, length)
 
-	for i := 0; i < length; i++ {
+	for i := range length {
 		deploys = append(deploys, &github.Deployment{
 			// Using int64() cast so the generic Ptr infers *int64 instead of *int
 			ID:          github.Ptr(int64(1001 + i)),
@@ -63,10 +69,17 @@ func (gc *MockGithubClient) ListDeployments(_ context.Context, _ string, _ *gith
 func (gc *MockGithubClient) ListDeploymentStatuses(_ context.Context, _ string, _ int64, _ *github.ListOptions) ([]*github.DeploymentStatus, *github.Response, error) {
 	time.Sleep(300 * time.Millisecond)
 
-	statuses := []*github.DeploymentStatus{
-		{
+	states := []string{"waiting", "queued", "in_progress", "success", "inactive"}
+
+	// spread out success timestamp randomly throughout the last 10 minutes
+	maxDuration := 10 * time.Minute
+	maxMs := maxDuration.Milliseconds()
+	randomMs := rand.Int64N(maxMs)
+	statuses := make([]*github.DeploymentStatus, len(states))
+	for _, state := range states {
+		statuses = append(statuses, &github.DeploymentStatus{
 			ID:             github.Ptr(int64(2001)),
-			State:          github.Ptr("success"),
+			State:          github.Ptr(state),
 			Description:    github.Ptr("Deployment finished successfully"),
 			EnvironmentURL: github.Ptr("https://prod.example.com"),
 			LogURL:         github.Ptr("https://ci.example.com/logs/1"),
@@ -74,8 +87,8 @@ func (gc *MockGithubClient) ListDeploymentStatuses(_ context.Context, _ string, 
 				Login: github.Ptr("octocat"),
 			},
 			CreatedAt: &github.Timestamp{Time: time.Now()},
-			UpdatedAt: &github.Timestamp{Time: time.Now().Add(-5 * time.Minute)},
-		},
+			UpdatedAt: &github.Timestamp{Time: time.Now().Add(-time.Duration(randomMs) * time.Millisecond)},
+		})
 	}
 
 	return statuses, &github.Response{NextPage: 0, Rate: github.Rate{Remaining: 1000}}, nil
@@ -86,9 +99,9 @@ func (gc *MockGithubClient) CompareCommits(_ context.Context, _, _, _ string, _ 
 
 	commitCmp := &github.CommitsComparison{
 		HTMLURL:      github.Ptr("https://example.com"),
-		Status:       github.Ptr("ahead"),
+		Status:       github.Ptr("diverged"),
 		AheadBy:      github.Ptr(2),
-		BehindBy:     github.Ptr(0),
+		BehindBy:     github.Ptr(2),
 		TotalCommits: github.Ptr(2),
 		BaseCommit: &github.RepositoryCommit{
 			SHA: github.Ptr("abc123def456"),
