@@ -476,7 +476,7 @@ export class ChartWithLegend<T extends RichDataPoint, O extends LineInfo> extend
           this.props.deployments?.map(deployment => {
             const data = [
               {
-                x: new Date(deployment.created_at),
+                x: new Date(deployment.succeeded_at),
                 y: 0,
                 name: `Deployment ${deployment.id}`,
                 unit: '',
@@ -484,7 +484,7 @@ export class ChartWithLegend<T extends RichDataPoint, O extends LineInfo> extend
                 deployment
               },
               {
-                x: new Date(deployment.created_at),
+                x: new Date(deployment.succeeded_at),
                 y: yMax,
                 name: `Deployment ${deployment.id}`,
                 unit: '',
@@ -504,19 +504,6 @@ export class ChartWithLegend<T extends RichDataPoint, O extends LineInfo> extend
               />
             );
           })}
-        {/*{this.props.showDeployments && (*/}
-        {/*  <ChartLine*/}
-        {/*    {...{*/}
-        {/*      key: `Deployment-X`,*/}
-        {/*      name: `Deployment-X`,*/}
-        {/*      data: [*/}
-        {/*        { x: timeStamp, y: 0, name: 'Deployment 4af20fb' },*/}
-        {/*        { x: timeStamp, y: yMax }*/}
-        {/*      ],*/}
-        {/*      interpolation: INTERPOLATION_STRATEGY*/}
-        {/*    }}*/}
-        {/*  />*/}
-        {/*)}*/}
 
         {this.props.data
           .map((serie, idx) => {
