@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -20,11 +19,6 @@ import (
 	"github.com/kiali/kiali/models"
 )
 
-type DeploymentsQuery struct {
-	From, To                     time.Time
-	Cluster, Namespace, Workload string
-}
-
 type DeploymentResponse struct {
 	Deployments []*model.Deployment `json:"deployments"`
 	Total       int                 `json:"total"`
@@ -36,16 +30,23 @@ func ExternalDeployments(
 	cache cache.KialiCache,
 	clientFactory kubernetes.ClientFactory,
 	discovery istio.MeshDiscovery,
+	deploymentClient external_deployments.DeploymentClient,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ds, err := external_deployments.NewDeploymentService(conf, deploymentClient)
+
+		ctx := r.Context()
+
 		vars := mux.Vars(r)
 		namespace := vars["namespace"]
 		workload := vars["workload"]
-		if len(workload) == 0 {
-			workload = vars["app"]
+		service := vars["service"]
+		app := vars["app"]
+		if len(service) == 0 {
+			workload = service
 		}
-		if len(workload) == 0 {
-			workload = vars["service"]
+		if len(app) == 0 {
+			workload = app
 		}
 		if len(workload) == 0 {
 			RespondWithError(w, http.StatusBadRequest, "No workload provided!")
@@ -53,24 +54,10 @@ func ExternalDeployments(
 		}
 
 		cluster := clusterNameFromQuery(conf, r.URL.Query())
-		ctx := context.Background()
-
-		owner := conf.ExternalServices.ExternalDeployments.Auth.Username.String()
-		if len(owner) == 0 {
-			RespondWithError(w, http.StatusBadRequest, "external_deployments.auth.username not set in config")
-			return
-		}
 
 		repo := extractRepoName(workload)
 
-		deploymentService, err := external_deployments.NewDeploymentService(conf, repo)
-		if err != nil {
-			RespondWithError(w, http.StatusServiceUnavailable, "could not set up external deployments")
-			return
-		}
-
-		// params
-		if err := deploymentService.ValidateRepo(ctx); err != nil {
+		if err := ds.SetRepo(ctx, repo); err != nil {
 			RespondWithError(w, http.StatusServiceUnavailable, fmt.Sprintf("no repository found for workload %s %s", workload, err))
 			return
 		}
@@ -80,14 +67,14 @@ func ExternalDeployments(
 			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
 			return
 		}
-		params := DeploymentsQuery{Cluster: cluster, Namespace: namespace, Workload: workload}
+		params := models.DeploymentsQuery{Cluster: cluster, Namespace: namespace, Workload: workload}
 
 		if err := extractDeploymentQueryParams(r, &params, nil); err != nil {
 			RespondWithError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 
-		deployments, err := deploymentService.ListDeploymentsInRange(ctx, params.From, params.To)
+		deployments, err := ds.ListDeploymentsInRange(ctx, params)
 		log.Tracef("deployments %+v\n", deployments)
 		if err != nil {
 			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
@@ -103,7 +90,7 @@ func ExternalDeployments(
 	}
 }
 
-func extractDeploymentQueryParams(r *http.Request, query *DeploymentsQuery, namespaceInfo *models.Namespace) error {
+func extractDeploymentQueryParams(r *http.Request, query *models.DeploymentsQuery, namespaceInfo *models.Namespace) error {
 	queryParams := r.URL.Query()
 	query.To = time.Now()
 

@@ -1,4 +1,4 @@
-package gh
+package github
 
 import (
 	"context"
@@ -11,20 +11,20 @@ import (
 	"github.com/kiali/kiali/log"
 )
 
-// GithubClientInterface mock for testing
-type GithubClientInterface interface {
+// API mock for testing
+type API interface {
 	GetRepository(ctx context.Context, repoName string) (*github.Repository, *github.Response, error)
 	ListDeployments(ctx context.Context, repoName string, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error)
 	ListDeploymentStatuses(ctx context.Context, repoName string, id int64, opts *github.ListOptions) ([]*github.DeploymentStatus, *github.Response, error)
 	CompareCommits(ctx context.Context, repoName, base, head string, opts *github.ListOptions) (*github.CommitsComparison, error)
 }
 
-type GithubClient struct {
+type Client struct {
 	client             *github.Client
 	owner, environment string
 }
 
-func MakeGithubClientInterface(conf *config.Config) (GithubClientInterface, error) {
+func NewAPI(conf *config.Config) (API, error) {
 	owner := conf.ExternalServices.ExternalDeployments.Auth.Username.String()
 	env := conf.ExternalServices.ExternalDeployments.Environment
 	githubPat := conf.ExternalServices.ExternalDeployments.Auth.Token.String()
@@ -50,18 +50,18 @@ func MakeGithubClientInterface(conf *config.Config) (GithubClientInterface, erro
 	return clientInterface, nil
 }
 
-func NewGithubClient(client *github.Client, owner, environment string) (GithubClientInterface, error) {
+func NewGithubClient(client *github.Client, owner, environment string) (API, error) {
 	if client == nil {
 		return nil, fmt.Errorf("github client cannot be nil")
 	}
-	return &GithubClient{
+	return &Client{
 		client:      client,
 		owner:       owner,
 		environment: environment,
 	}, nil
 }
 
-func (gc *GithubClient) GetRepository(ctx context.Context, repoName string) (*github.Repository, *github.Response, error) {
+func (gc *Client) GetRepository(ctx context.Context, repoName string) (*github.Repository, *github.Response, error) {
 	start := time.Now()
 	defer func() {
 		log.Tracef("getRepository took %v\n", time.Since(start))
@@ -73,7 +73,7 @@ func (gc *GithubClient) GetRepository(ctx context.Context, repoName string) (*gi
 	return repo, resp, nil
 }
 
-func (gc *GithubClient) ListDeployments(ctx context.Context, repoName string, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error) {
+func (gc *Client) ListDeployments(ctx context.Context, repoName string, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error) {
 	start := time.Now()
 	defer func() {
 		log.Tracef("")
@@ -86,7 +86,7 @@ func (gc *GithubClient) ListDeployments(ctx context.Context, repoName string, op
 	return deploys, resp, err
 }
 
-func (gc *GithubClient) ListDeploymentStatuses(ctx context.Context, repoName string, id int64, opts *github.ListOptions) ([]*github.DeploymentStatus, *github.Response, error) {
+func (gc *Client) ListDeploymentStatuses(ctx context.Context, repoName string, id int64, opts *github.ListOptions) ([]*github.DeploymentStatus, *github.Response, error) {
 	start := time.Now()
 	defer func() {
 		log.Tracef("listDeploymentStatuses took %v\n", time.Since(start))
@@ -95,7 +95,7 @@ func (gc *GithubClient) ListDeploymentStatuses(ctx context.Context, repoName str
 	return statuses, resp, err
 }
 
-func (gc *GithubClient) CompareCommits(ctx context.Context, repoName, base, head string, opts *github.ListOptions) (*github.CommitsComparison, error) {
+func (gc *Client) CompareCommits(ctx context.Context, repoName, base, head string, opts *github.ListOptions) (*github.CommitsComparison, error) {
 	start := time.Now()
 	defer func() {
 		log.Tracef("compareCommits took %v\n", time.Since(start))

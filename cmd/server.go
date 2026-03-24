@@ -37,6 +37,7 @@ import (
 	"github.com/kiali/kiali/cache"
 	"github.com/kiali/kiali/config"
 	"github.com/kiali/kiali/controller"
+	"github.com/kiali/kiali/external_deployments"
 	"github.com/kiali/kiali/frontend"
 	"github.com/kiali/kiali/grafana"
 	"github.com/kiali/kiali/istio"
@@ -113,20 +114,22 @@ func run(ctx context.Context, conf *config.Config, staticAssetFS fs.FS, clientFa
 		log.Debug("Tracing is disabled")
 	}
 
-	if conf.ExternalServices.Tracing.Enabled {
+	grafana := grafana.NewService(conf, clientFactory.GetSAHomeClusterClient())
+
+	var deploymentService external_deployments.DeploymentClient
+
+	if conf.ExternalServices.ExternalDeployments.Enabled {
 		go func() {
-			client, err := tracing.NewClient(ctx, conf, clientFactory.GetSAHomeClusterClient().GetToken(), true)
+			service, err := external_deployments.NewDeploymentClient(conf)
 			if err != nil {
-				log.Fatalf("Error creating tracing client: %s", err)
+				log.Fatalf("Error creating external deployments client: %s", err)
 				return
 			}
-			tracingClient = client
+			deploymentService = service
 		}()
 	} else {
-		log.Debug("Tracing is disabled")
+		log.Debug("External deployments are disabled")
 	}
-
-	grafana := grafana.NewService(conf, clientFactory.GetSAHomeClusterClient())
 
 	// Needs to be started after the server so that the cache is started because the controllers use the cache.
 	// Passing nil here because the tracing client is not used for validations and that is all this layer is used for.
@@ -168,7 +171,7 @@ func run(ctx context.Context, conf *config.Config, staticAssetFS fs.FS, clientFa
 	}
 
 	// Start listening to requests
-	server, err := server.NewServer(ctx, cpm, clientFactory, cache, conf, prom, tracingLoader, discovery, staticAssetFS)
+	server, err := server.NewServer(ctx, cpm, clientFactory, cache, conf, prom, tracingLoader, deploymentService, discovery, staticAssetFS)
 	if err != nil {
 		log.Fatal(err)
 	}

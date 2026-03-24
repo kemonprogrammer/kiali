@@ -1,4 +1,4 @@
-package gh
+package github
 
 import (
 	"context"
@@ -14,38 +14,77 @@ import (
 	"github.com/kiali/kiali/external_deployments/model"
 )
 
-type GithubDeploymentService struct {
-	clientInterface       GithubClientInterface
+type DeploymentClient struct {
+	api                   API
 	repo                  string
 	ghDeployments         []*github.Deployment
 	successfulDeployments []*model.Deployment
 }
 
-func NewGithubDeploymentService(clientInterface GithubClientInterface, repo string) (*GithubDeploymentService, error) {
-	if clientInterface == nil {
-		return nil, fmt.Errorf("clientInterface cannot be nil")
+func NewDeploymentClient(api API) (*DeploymentClient, error) {
+	if api == nil {
+		return nil, fmt.Errorf("api cannot be nil")
 	}
-	return &GithubDeploymentService{
-		clientInterface: clientInterface,
-		repo:            repo,
+	return &DeploymentClient{
+		api: api,
 	}, nil
 }
 
-func (gs *GithubDeploymentService) ListDeployments(ctx context.Context) ([]*model.Deployment, error) {
-	err := gs.loadDeployments(ctx)
+func (gdc *DeploymentClient) ListDeployments(ctx context.Context) ([]*model.Deployment, error) {
+	err := gdc.loadDeployments(ctx)
 
 	if err != nil {
 		return nil, err
 	}
-	return toDeployments(gs.ghDeployments), nil
+	return toDeployments(gdc.ghDeployments), nil
 }
 
-func (gs *GithubDeploymentService) ValidateRepo(ctx context.Context) error {
-	_, _, err := gs.clientInterface.GetRepository(ctx, gs.repo)
+// ListDeploymentsInRange lists deployments with a deployment status successful in range [from, to]
+func (gdc *DeploymentClient) ListDeploymentsInRange(ctx context.Context, from, to time.Time) ([]*model.Deployment, error) {
+
+	err := gdc.loadSuccessfulDeploymentsInRange(ctx, from, to)
+	if err != nil {
+		return nil, err
+	}
+	successful := gdc.successfulDeployments
+
+	inRange := filterTimerangeBySucceededAt(successful, from, to)
+
+	var oneBefore *model.Deployment
+	for _, sd := range gdc.successfulDeployments {
+		if sd.SucceededAt.Before(from) {
+			oneBefore = sd
+			break
+		}
+	}
+
+	if oneBefore != nil {
+		inRange = append(inRange, oneBefore)
+	}
+
+	populated, err := gdc.populateWithCommits(ctx, inRange)
+	if err != nil {
+		return nil, err
+	}
+
+	// remove one before
+	if oneBefore != nil {
+		populated = populated[:len(populated)-1]
+	}
+	return populated, nil
+}
+
+func (gdc *DeploymentClient) SetRepo(ctx context.Context, repo string) error {
+	_, _, err := gdc.api.GetRepository(ctx, repo)
 	if err != nil {
 		return err
 	}
+	gdc.repo = repo
 	return nil
+}
+
+func (gdc *DeploymentClient) GetRepo() string {
+	return gdc.repo
 }
 
 // loadSuccessfulDeploymentsInRange
@@ -60,12 +99,12 @@ func (gs *GithubDeploymentService) ValidateRepo(ctx context.Context) error {
 //
 // before updating cache sort the deployments by succeededAt
 // filter successful deployments in time range
-func (gs *GithubDeploymentService) loadSuccessfulDeploymentsInRange(ctx context.Context, from, to time.Time) error {
-	if err := gs.loadDeployments(ctx); err != nil {
+func (gdc *DeploymentClient) loadSuccessfulDeploymentsInRange(ctx context.Context, from, to time.Time) error {
+	if err := gdc.loadDeployments(ctx); err != nil {
 		return err
 	}
 
-	allDeploys := toDeployments(gs.ghDeployments)
+	allDeploys := toDeployments(gdc.ghDeployments)
 
 	// load successful deployments in Range
 	possibleSuccessfulDeploys := filterTimerangeBySuccessPossible(allDeploys, from, to)
@@ -74,66 +113,31 @@ func (gs *GithubDeploymentService) loadSuccessfulDeploymentsInRange(ctx context.
 	newPossibleSuccessfulDeploys := make([]*model.Deployment, 0, len(possibleSuccessfulDeploys))
 	for _, possibleDeploy := range possibleSuccessfulDeploys {
 
-		if !slices.ContainsFunc(gs.successfulDeployments, func(deploy *model.Deployment) bool {
+		if !slices.ContainsFunc(gdc.successfulDeployments, func(deploy *model.Deployment) bool {
 			return deploy.ID == possibleDeploy.ID
 		}) {
 			newPossibleSuccessfulDeploys = append(newPossibleSuccessfulDeploys, possibleDeploy)
 		}
 	}
 
-	populated, err := gs.populateSuccessStatus(ctx, newPossibleSuccessfulDeploys)
+	populated, err := gdc.populateSuccessStatus(ctx, newPossibleSuccessfulDeploys)
 	if err != nil {
 		return err
 	}
 
-	newSuccessfulDeploys := append(gs.successfulDeployments, populated...)
+	newSuccessfulDeploys := append(gdc.successfulDeployments, populated...)
 	slices.SortFunc(newSuccessfulDeploys, func(a, b *model.Deployment) int {
 		return int(b.SucceededAt.Unix() - a.SucceededAt.Unix()) // assumption: running on 64-bit or higher architecture
 	})
 
-	gs.successfulDeployments = newSuccessfulDeploys
+	gdc.successfulDeployments = newSuccessfulDeploys
 	return nil
 }
 
-// ListDeploymentsInRange lists deployments with a deployment status successful in range [from, to]
-func (gs *GithubDeploymentService) ListDeploymentsInRange(ctx context.Context, from, to time.Time) ([]*model.Deployment, error) {
-
-	err := gs.loadSuccessfulDeploymentsInRange(ctx, from, to)
-	if err != nil {
-		return nil, err
-	}
-	successful := gs.successfulDeployments
-
-	inRange := filterTimerangeBySucceededAt(successful, from, to)
-
-	var oneBefore *model.Deployment
-	for _, sd := range gs.successfulDeployments {
-		if sd.SucceededAt.Before(from) {
-			oneBefore = sd
-			break
-		}
-	}
-
-	if oneBefore != nil {
-		inRange = append(inRange, oneBefore)
-	}
-
-	populated, err := gs.populateWithCommits(ctx, inRange)
-	if err != nil {
-		return nil, err
-	}
-
-	// remove one before
-	if oneBefore != nil {
-		populated = populated[:len(populated)-1]
-	}
-	return populated, nil
-}
-
 // loadDeployments loads all deployments on the first time and stores them in cache
-func (gs *GithubDeploymentService) loadDeployments(ctx context.Context) error {
-	if len(gs.ghDeployments) > 0 {
-		prevNewestID := gs.ghDeployments[0].GetID()
+func (gdc *DeploymentClient) loadDeployments(ctx context.Context) error {
+	if len(gdc.ghDeployments) > 0 {
+		prevNewestID := gdc.ghDeployments[0].GetID()
 
 		newDeployCount := -1
 		var allDeploys []*github.Deployment
@@ -144,7 +148,7 @@ func (gs *GithubDeploymentService) loadDeployments(ctx context.Context) error {
 		}
 
 		for opts.ListOptions.Page > 0 && newDeployCount == -1 {
-			deploys, resp, err := gs.clientInterface.ListDeployments(ctx, gs.repo, opts)
+			deploys, resp, err := gdc.api.ListDeployments(ctx, gdc.repo, opts)
 			if err != nil {
 				return fmt.Errorf("error while fetching github ghDeployments: %w", err)
 			}
@@ -173,7 +177,7 @@ func (gs *GithubDeploymentService) loadDeployments(ctx context.Context) error {
 		if newDeployCount > 0 {
 			// assumption deployments from API are sorted by creation date in descending oder
 			newDeploys := allDeploys[:newDeployCount]
-			gs.ghDeployments = append(newDeploys, gs.ghDeployments...)
+			gdc.ghDeployments = append(newDeploys, gdc.ghDeployments...)
 			return nil
 		}
 		return fmt.Errorf("Could not find cached deployment %d\n", prevNewestID)
@@ -185,7 +189,7 @@ func (gs *GithubDeploymentService) loadDeployments(ctx context.Context) error {
 	}
 
 	for opts.ListOptions.Page > 0 {
-		deploys, resp, err := gs.clientInterface.ListDeployments(ctx, gs.repo, opts)
+		deploys, resp, err := gdc.api.ListDeployments(ctx, gdc.repo, opts)
 		if err != nil {
 			return fmt.Errorf("error while fetching github ghDeployments: %w", err)
 		}
@@ -200,11 +204,11 @@ func (gs *GithubDeploymentService) loadDeployments(ctx context.Context) error {
 		opts.ListOptions.Page = resp.NextPage
 	}
 
-	gs.ghDeployments = allDeploys
+	gdc.ghDeployments = allDeploys
 	return nil
 }
 
-func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, deployments []*model.Deployment) ([]*model.Deployment, error) {
+func (gdc *DeploymentClient) populateWithCommits(ctx context.Context, deployments []*model.Deployment) ([]*model.Deployment, error) {
 	if len(deployments) <= 1 {
 		return deployments, nil
 	}
@@ -221,7 +225,7 @@ func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, depl
 			base := deployments[i+1].SHA
 
 			// Use the gCtx so this request cancels if another goroutine fails
-			commitCmp, err := gs.clientInterface.CompareCommits(gCtx, gs.repo, base, head, nil)
+			commitCmp, err := gdc.api.CompareCommits(gCtx, gdc.repo, base, head, nil)
 			if err != nil {
 				return fmt.Errorf("error while comparing commits: %w", err)
 			}
@@ -233,7 +237,7 @@ func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, depl
 				d.Added = toCommits(commitCmp)
 
 			case "behind":
-				behindCmp, err := gs.clientInterface.CompareCommits(gCtx, gs.repo, head, base, &github.ListOptions{})
+				behindCmp, err := gdc.api.CompareCommits(gCtx, gdc.repo, head, base, &github.ListOptions{})
 				if err != nil {
 					return fmt.Errorf("error comparing behind commits: %w", err)
 				}
@@ -242,7 +246,7 @@ func (gs *GithubDeploymentService) populateWithCommits(ctx context.Context, depl
 			case "diverged":
 				d.Added = toCommits(commitCmp)
 				mergeBase := commitCmp.GetMergeBaseCommit().GetSHA()
-				divergedCmp, err := gs.clientInterface.CompareCommits(gCtx, gs.repo, mergeBase, base, &github.ListOptions{})
+				divergedCmp, err := gdc.api.CompareCommits(gCtx, gdc.repo, mergeBase, base, &github.ListOptions{})
 				if err != nil {
 					return fmt.Errorf("error comparing diverged commits: %w", err)
 				}
@@ -294,7 +298,7 @@ func filterTimerangeBySuccessPossible(deployments []*model.Deployment, from time
 }
 
 // populateSuccessStatus assumption: deployment status states: x -> success -> inactive
-func (gs *GithubDeploymentService) populateSuccessStatus(ctx context.Context, deploys []*model.Deployment) ([]*model.Deployment, error) {
+func (gdc *DeploymentClient) populateSuccessStatus(ctx context.Context, deploys []*model.Deployment) ([]*model.Deployment, error) {
 	successful := make([]*model.Deployment, 0, len(deploys))
 	var mu sync.Mutex
 	g, gCtx := errgroup.WithContext(ctx)
@@ -308,7 +312,7 @@ func (gs *GithubDeploymentService) populateSuccessStatus(ctx context.Context, de
 			}
 		out:
 			for opts.Page > 0 {
-				statuses, resp, err := gs.clientInterface.ListDeploymentStatuses(gCtx, gs.repo, d.ID, opts)
+				statuses, resp, err := gdc.api.ListDeploymentStatuses(gCtx, gdc.repo, d.ID, opts)
 				if err != nil {
 					return fmt.Errorf("failed to get deployment statuses for %d: %w", d.ID, err)
 				}

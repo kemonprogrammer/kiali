@@ -9,6 +9,7 @@ import (
 	"github.com/kiali/kiali/business"
 	"github.com/kiali/kiali/cache"
 	"github.com/kiali/kiali/config"
+	"github.com/kiali/kiali/external_deployments"
 	"github.com/kiali/kiali/grafana"
 	"github.com/kiali/kiali/graph"
 	"github.com/kiali/kiali/handlers"
@@ -50,6 +51,7 @@ func NewRoutes(
 	perses *perses.Service,
 	discovery *istio.Discovery,
 	graphCache graph.GraphCache,
+	deploymentClient external_deployments.DeploymentClient,
 	refreshJobManager *graph.RefreshJobManager,
 	aiStore ai.AIStore,
 ) (r *Routes) {
@@ -1089,7 +1091,7 @@ func NewRoutes(
 			log.MetricsLogName,
 			"GET",
 			"/api/namespaces/{namespace}/services/{service}/deployments",
-			handlers.ExternalDeployments(conf, kialiCache, clientFactory, discovery),
+			handlers.ExternalDeployments(conf, kialiCache, clientFactory, discovery, deploymentClient),
 			true,
 		},
 		// swagger:route GET /namespaces/{namespace}/apps/{app}/deployments externalDeployments
@@ -1111,7 +1113,7 @@ func NewRoutes(
 			log.MetricsLogName,
 			"GET",
 			"/api/namespaces/{namespace}/apps/{app}/deployments",
-			handlers.ExternalDeployments(conf, kialiCache, clientFactory, discovery),
+			handlers.ExternalDeployments(conf, kialiCache, clientFactory, discovery, deploymentClient),
 			true,
 		},
 		// swagger:route GET /namespaces/{namespace}/workloads/{workload}/deployments externalDeployments
@@ -1133,7 +1135,7 @@ func NewRoutes(
 			log.MetricsLogName,
 			"GET",
 			"/api/namespaces/{namespace}/workloads/{workload}/deployments",
-			handlers.ExternalDeployments(conf, kialiCache, clientFactory, discovery),
+			handlers.ExternalDeployments(conf, kialiCache, clientFactory, discovery, deploymentClient),
 			true,
 		},
 		// swagger:route GET /namespaces/{namespace}/ztunnel/{workload}/dashboard workloads ztunnelDashboard

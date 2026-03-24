@@ -1,4 +1,4 @@
-package gh
+package github
 
 import (
 	"context"
@@ -15,7 +15,7 @@ type MockGithubClient struct {
 	owner, environment string
 }
 
-func NewMockGithubClient() GithubClientInterface {
+func NewMockAPI() API {
 	return &MockGithubClient{
 		owner:       "mock-owner",
 		environment: "mock-environment",

@@ -3,37 +3,67 @@ package external_deployments
 import (
 	"context"
 	"fmt"
-	"os"
-	"time"
 
 	"github.com/kiali/kiali/config"
-	"github.com/kiali/kiali/external_deployments/gh"
 	"github.com/kiali/kiali/external_deployments/model"
-	"github.com/kiali/kiali/log"
+	"github.com/kiali/kiali/models"
+	"github.com/kiali/kiali/observability"
 )
 
-type DeploymentService interface {
-	ListDeploymentsInRange(ctx context.Context, from, to time.Time) ([]*model.Deployment, error)
-	ValidateRepo(ctx context.Context) error
+type DeploymentService struct {
+	deploymentClientInterface DeploymentClient
+	conf                      *config.Config
 }
 
-func NewDeploymentService(conf *config.Config, repo string) (DeploymentService, error) {
-	if !conf.ExternalServices.ExternalDeployments.Enabled {
-		return nil, fmt.Errorf("external deployments not enabled")
+func NewDeploymentService(conf *config.Config, client DeploymentClient) (*DeploymentService, error) {
+
+	return &DeploymentService{
+		deploymentClientInterface: client,
+		conf:                      conf,
+	}, nil
+}
+
+func (in *DeploymentService) client() (DeploymentClient, error) {
+	if !in.conf.ExternalServices.ExternalDeployments.Enabled {
+		return nil, fmt.Errorf("external deployments are not enabled")
+	}
+	if in.deploymentClientInterface == nil {
+		return nil, fmt.Errorf("external deployments service is not initialized")
 	}
 
-	provider := conf.ExternalServices.ExternalDeployments.Provider
-	if provider == "github" {
-		deploymentClient, err := gh.MakeGithubClientInterface(conf)
-		if err != nil {
-			return nil, err
-		}
-		if os.Getenv("TEST") == "true" {
-			log.Info("using mock GitHub client")
-			deploymentClient = gh.NewMockGithubClient()
-		}
-		return gh.NewGithubDeploymentService(deploymentClient, repo)
+	return in.deploymentClientInterface, nil
+}
+func (in *DeploymentService) ListDeploymentsInRange(ctx context.Context, q models.DeploymentsQuery) ([]*model.Deployment, error) {
+	client, err := in.client()
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, fmt.Errorf("external deployments provider %s not supported ", provider)
+	var end observability.EndFunc
+	ctx, end = observability.StartSpan(ctx, "ListDeploymentsInRange",
+		observability.Attribute("package", "external_deployments"),
+		//observability.Attribute(observability.TracingClusterTag, query.Cluster),
+		observability.Attribute("cluster", q.Cluster),
+		observability.Attribute("namespace", q.Namespace),
+		observability.Attribute("repository", client.GetRepo()),
+	)
+	defer end()
+
+	deployments, err := client.ListDeploymentsInRange(ctx, q.From, q.To)
+	if err != nil {
+		return nil, err
+	}
+	return deployments, nil
+}
+
+func (in *DeploymentService) SetRepo(ctx context.Context, repo string) error {
+	client, err := in.client()
+	if err != nil {
+		return err
+	}
+	err = client.SetRepo(ctx, repo)
+	if err != nil {
+		return err
+	}
+	return nil
 }

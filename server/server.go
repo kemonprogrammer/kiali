@@ -16,6 +16,7 @@ import (
 	"github.com/kiali/kiali/business"
 	"github.com/kiali/kiali/cache"
 	"github.com/kiali/kiali/config"
+	"github.com/kiali/kiali/external_deployments"
 	"github.com/kiali/kiali/grafana"
 	"github.com/kiali/kiali/istio"
 	"github.com/kiali/kiali/kubernetes"
@@ -43,13 +44,14 @@ func NewServer(ctx context.Context,
 	conf *config.Config,
 	prom prometheus.ClientInterface,
 	traceClientLoader func() tracing.ClientInterface,
+	deploymentClient external_deployments.DeploymentClient,
 	discovery *istio.Discovery,
 	staticAssetFS fs.FS,
 ) (*Server, error) {
 	grafana := grafana.NewService(conf, clientFactory.GetSAHomeClusterClient())
 	perses := perses.NewService(conf, clientFactory.GetSAHomeClusterClient())
 	// create a router that will route all incoming API server requests to different handlers
-	router, err := routing.NewRouter(ctx, conf, cache, clientFactory, prom, traceClientLoader, controlPlaneMonitor, grafana, perses, discovery, staticAssetFS)
+	router, err := routing.NewRouter(ctx, conf, cache, clientFactory, prom, traceClientLoader, controlPlaneMonitor, grafana, perses, deploymentClient, discovery, staticAssetFS)
 	if err != nil {
 		return nil, err
 	}

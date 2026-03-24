@@ -178,6 +178,7 @@ This mode allows you to analyze pre-collected data without requiring a live clus
 				conf,
 				promClient,    // prom
 				tracingLoader, // traceClientLoader
+				nil,           // deploymentService
 				discovery,
 				staticAssetFS,
 			)

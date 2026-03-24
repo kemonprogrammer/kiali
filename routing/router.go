@@ -20,6 +20,7 @@ import (
 	"github.com/kiali/kiali/business"
 	"github.com/kiali/kiali/cache"
 	"github.com/kiali/kiali/config"
+	"github.com/kiali/kiali/external_deployments"
 	"github.com/kiali/kiali/grafana"
 	"github.com/kiali/kiali/graph"
 	"github.com/kiali/kiali/handlers"
@@ -45,6 +46,7 @@ func NewRouter(
 	cpm business.ControlPlaneMonitor,
 	grafana *grafana.Service,
 	perses *perses.Service,
+	deploymentClient external_deployments.DeploymentClient,
 	discovery *istio.Discovery,
 	staticAssetFS fs.FS,
 ) (*mux.Router, error) {
@@ -198,7 +200,7 @@ func NewRouter(
 	}
 
 	// Build our API server routes and install them.
-	apiRoutes := NewRoutes(conf, kialiCache, clientFactory, cpm, prom, traceClientLoader, authController, grafana, perses, discovery, graphCache, refreshJobManager, aiStore)
+	apiRoutes := NewRoutes(conf, kialiCache, clientFactory, cpm, prom, traceClientLoader, authController, grafana, perses, discovery, graphCache, deploymentClient, refreshJobManager, aiStore)
 	// Add any auth routes to the app router.
 	apiRoutes.Routes = append(apiRoutes.Routes, authRoutes...)
 
