@@ -95,6 +95,8 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
   spanOverlay: SpanOverlay;
   static grafanaInfoPromise: Promise<GrafanaInfo | undefined> | undefined;
   static persesInfoPromise: Promise<PersesInfo | undefined> | undefined;
+  private renderStartTime: number;
+  private fetchStartTime: number;
 
   constructor(props: Props) {
     super(props);
@@ -122,6 +124,10 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
     this.spanOverlay = new SpanOverlay(changed => {
       this.setState({ spanOverlay: changed });
     });
+
+    // measure deployments rendering time
+    this.renderStartTime = 0;
+    this.fetchStartTime = 0;
   }
 
   private initOptions(settings: MetricsSettings): IstioMetricsOptions {
@@ -178,6 +184,26 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
 
       this.spanOverlay.reset();
       this.refresh();
+    }
+
+    // measure deployments render time
+    if (this.renderStartTime > 0 && prevState.deployments !== this.state.deployments) {
+      setTimeout(() => {
+        const endTime = performance.now();
+
+        const networkTime = this.renderStartTime - this.fetchStartTime;
+        const renderTime = endTime - this.renderStartTime;
+        const totalTime = endTime - this.fetchStartTime; // or: networkTime + renderTime
+
+        console.log(
+          `--- Performance for ${this.state.deployments?.length} Deployments ---`,
+          `\nNetwork Time: ${networkTime.toFixed(2)} ms`,
+          `\nRender Time:  ${renderTime.toFixed(2)} ms`,
+          `\nTotal Time:   ${totalTime.toFixed(2)} ms`
+        );
+
+        this.renderStartTime = 0;
+      }, 0);
     }
   }
 
@@ -248,11 +274,16 @@ class IstioMetricsComponent extends React.Component<Props, MetricsState> {
       opts.byLabels = (opts.byLabels ?? []).concat('reporter');
     }
 
+    this.fetchStartTime = performance.now();
+
     let promise: Promise<ApiResponse<DeploymentsModel>>;
     promise = API.getDeployments(this.props.namespace, this.props.object, opts, this.props.cluster);
 
     return promise
       .then(response => {
+        // measure deployments render time
+        this.renderStartTime = performance.now();
+
         this.setState({
           deployments: response.data.deployments
         });
