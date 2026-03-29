@@ -15,12 +15,11 @@ type DeploymentService struct {
 	conf                      *config.Config
 }
 
-func NewDeploymentService(conf *config.Config, client DeploymentClient) (*DeploymentService, error) {
-
+func NewDeploymentService(conf *config.Config, client DeploymentClient) *DeploymentService {
 	return &DeploymentService{
 		deploymentClientInterface: client,
 		conf:                      conf,
-	}, nil
+	}
 }
 
 func (in *DeploymentService) client() (DeploymentClient, error) {
@@ -45,7 +44,7 @@ func (in *DeploymentService) ListDeploymentsInRange(ctx context.Context, q model
 		//observability.Attribute(observability.TracingClusterTag, query.Cluster),
 		observability.Attribute("cluster", q.Cluster),
 		observability.Attribute("namespace", q.Namespace),
-		observability.Attribute("repository", client.GetRepo()),
+		observability.Attribute("repository", q.Repository),
 	)
 	defer end()
 

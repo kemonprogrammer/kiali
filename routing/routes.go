@@ -1072,7 +1072,7 @@ func NewRoutes(
 			handlers.WorkloadDashboard(conf, kialiCache, clientFactory, discovery, prom, grafana),
 			true,
 		},
-		// swagger:route GET /namespaces/{namespace}/services/{service}/deployments externalDeployments
+		// swagger:route GET /namespaces/{namespace}/services/{service}/deployments serviceExternalDeployments
 		// ---
 		// Endpoint to fetch external deployments, related to a single service
 		//
@@ -1087,14 +1087,14 @@ func NewRoutes(
 		//      200: deploymentsResponse
 		//
 		{
-			"ExternalDeployments",
+			"ServiceExternalDeployments",
 			log.MetricsLogName,
 			"GET",
 			"/api/namespaces/{namespace}/services/{service}/deployments",
-			handlers.ExternalDeployments(conf, kialiCache, clientFactory, discovery, deploymentClient),
+			handlers.ServiceExternalDeployments(conf, kialiCache, clientFactory, discovery, deploymentClient),
 			true,
 		},
-		// swagger:route GET /namespaces/{namespace}/apps/{app}/deployments externalDeployments
+		// swagger:route GET /namespaces/{namespace}/apps/{app}/deployments appExternalDeployments
 		// ---
 		// Endpoint to fetch external deployments, related to a single app
 		//
@@ -1109,14 +1109,14 @@ func NewRoutes(
 		//      200: deploymentsResponse
 		//
 		{
-			"ExternalDeployments",
+			"AppExternalDeployments",
 			log.MetricsLogName,
 			"GET",
 			"/api/namespaces/{namespace}/apps/{app}/deployments",
-			handlers.ExternalDeployments(conf, kialiCache, clientFactory, discovery, deploymentClient),
+			handlers.AppExternalDeployments(conf, kialiCache, clientFactory, discovery, deploymentClient),
 			true,
 		},
-		// swagger:route GET /namespaces/{namespace}/workloads/{workload}/deployments externalDeployments
+		// swagger:route GET /namespaces/{namespace}/workloads/{workload}/deployments workloadExternalDeployments
 		// ---
 		// Endpoint to fetch external deployments, related to a single workload
 		//
@@ -1131,11 +1131,11 @@ func NewRoutes(
 		//      200: deploymentsResponse
 		//
 		{
-			"ExternalDeployments",
+			"WorkloadExternalDeployments",
 			log.MetricsLogName,
 			"GET",
 			"/api/namespaces/{namespace}/workloads/{workload}/deployments",
-			handlers.ExternalDeployments(conf, kialiCache, clientFactory, discovery, deploymentClient),
+			handlers.WorkloadExternalDeployments(conf, kialiCache, clientFactory, discovery, deploymentClient),
 			true,
 		},
 		// swagger:route GET /namespaces/{namespace}/ztunnel/{workload}/dashboard workloads ztunnelDashboard

@@ -162,7 +162,7 @@ func (gdc *DeploymentClient) loadDeployments(ctx context.Context) error {
 			}
 			allDeploys = append(allDeploys, deploys...)
 
-			if resp.Rate.Remaining <= 10 {
+			if resp.Rate.Remaining == 10 {
 				return fmt.Errorf("rate limit nearly exhausted, only 10 calls remaining; resets at %v",
 					resp.Rate.Reset)
 			}
@@ -196,7 +196,7 @@ func (gdc *DeploymentClient) loadDeployments(ctx context.Context) error {
 
 		allDeploys = append(allDeploys, deploys...)
 
-		if resp.Rate.Remaining <= 10 {
+		if resp.Rate.Remaining == 10 {
 			return fmt.Errorf("rate limit nearly exhausted, only 10 calls remaining; resets at %v",
 				resp.Rate.Reset)
 		}
@@ -318,7 +318,7 @@ func (gdc *DeploymentClient) populateSuccessStatus(ctx context.Context, deploys 
 				}
 				opts.Page = resp.NextPage
 
-				if resp.Rate.Remaining <= 10 {
+				if resp.Rate.Remaining == 10 {
 					return fmt.Errorf("rate limit nearly exhausted, only 10 calls remaining; resets at %v", resp.Rate.Reset)
 				}
 

@@ -36,11 +36,6 @@ func NewAPI(conf *config.Config) (API, error) {
 		return nil, fmt.Errorf("no external deployments auth token provided")
 	}
 
-	//todo remove
-	fmt.Printf("Github PAT from config: %s\n", githubPat)
-	fmt.Printf("owner from config: %s\n", owner)
-	fmt.Printf("env from config: %s\n", env)
-
 	gh := github.NewClient(nil).WithAuthToken(githubPat)
 	clientInterface, err := NewGithubClient(gh, owner, env)
 	if err != nil {

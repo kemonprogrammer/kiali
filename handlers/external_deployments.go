@@ -24,50 +24,150 @@ type DeploymentResponse struct {
 	Total       int                 `json:"total"`
 }
 
-// ExternalDeployments is the API handler to fetch GitHub deployments, related to a single workload
-func ExternalDeployments(
+// WorkloadExternalDeployments is the API handler to fetch GitHub deployments, related to a single workload
+func WorkloadExternalDeployments(
 	conf *config.Config,
 	cache cache.KialiCache,
 	clientFactory kubernetes.ClientFactory,
 	discovery istio.MeshDiscovery,
 	deploymentClient external_deployments.DeploymentClient,
 ) http.HandlerFunc {
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		ds, err := external_deployments.NewDeploymentService(conf, deploymentClient)
-
 		ctx := r.Context()
-
 		vars := mux.Vars(r)
 		namespace := vars["namespace"]
 		workload := vars["workload"]
-		service := vars["service"]
-		app := vars["app"]
-		if len(service) == 0 {
-			workload = service
-		}
-		if len(app) == 0 {
-			workload = app
-		}
+
 		if len(workload) == 0 {
 			RespondWithError(w, http.StatusBadRequest, "No workload provided!")
 			return
 		}
 
-		cluster := clusterNameFromQuery(conf, r.URL.Query())
-
 		repo := extractRepoName(workload)
-
+		ds := external_deployments.NewDeploymentService(conf, deploymentClient)
 		if err := ds.SetRepo(ctx, repo); err != nil {
 			RespondWithError(w, http.StatusServiceUnavailable, fmt.Sprintf("no repository found for workload %s %s", workload, err))
 			return
 		}
 
-		_, err = checkNamespaceAccess(w, r, conf, cache, discovery, clientFactory, namespace, cluster)
+		cluster := clusterNameFromQuery(conf, r.URL.Query())
+		if _, err := checkNamespaceAccess(w, r, conf, cache, discovery, clientFactory, namespace, cluster); err != nil {
+			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+		params := models.DeploymentsQuery{Cluster: cluster, Namespace: namespace, Repository: repo}
+
+		if err := extractDeploymentQueryParams(r, &params, nil); err != nil {
+			RespondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		deployments, err := ds.ListDeploymentsInRange(ctx, params)
+		log.Tracef("deployments %+v\n", deployments)
 		if err != nil {
 			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
 			return
 		}
-		params := models.DeploymentsQuery{Cluster: cluster, Namespace: namespace, Workload: workload}
+
+		response := &DeploymentResponse{
+			Deployments: deployments,
+			Total:       len(deployments),
+		}
+		log.Tracef("response %+v\n", response)
+		RespondWithJSON(w, http.StatusOK, response)
+	}
+}
+
+// ServiceExternalDeployments is the API handler to fetch GitHub deployments, related to a single service
+func ServiceExternalDeployments(
+	conf *config.Config,
+	cache cache.KialiCache,
+	clientFactory kubernetes.ClientFactory,
+	discovery istio.MeshDiscovery,
+	deploymentClient external_deployments.DeploymentClient,
+) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		vars := mux.Vars(r)
+		namespace := vars["namespace"]
+		service := vars["service"]
+
+		if len(service) == 0 {
+			RespondWithError(w, http.StatusBadRequest, "No service provided!")
+			return
+		}
+
+		repo := extractRepoName(service)
+		ds := external_deployments.NewDeploymentService(conf, deploymentClient)
+
+		if err := ds.SetRepo(ctx, repo); err != nil {
+			RespondWithError(w, http.StatusServiceUnavailable, fmt.Sprintf("no repository found for service %s %s", service, err))
+			return
+		}
+
+		cluster := clusterNameFromQuery(conf, r.URL.Query())
+		if _, err := checkNamespaceAccess(w, r, conf, cache, discovery, clientFactory, namespace, cluster); err != nil {
+			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+		params := models.DeploymentsQuery{Cluster: cluster, Namespace: namespace, Repository: repo}
+
+		if err := extractDeploymentQueryParams(r, &params, nil); err != nil {
+			RespondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		deployments, err := ds.ListDeploymentsInRange(ctx, params)
+		log.Tracef("deployments %+v\n", deployments)
+		if err != nil {
+			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+
+		response := &DeploymentResponse{
+			Deployments: deployments,
+			Total:       len(deployments),
+		}
+		log.Tracef("response %+v\n", response)
+		RespondWithJSON(w, http.StatusOK, response)
+	}
+}
+
+// AppExternalDeployments is the API handler to fetch GitHub deployments, related to a single app
+func AppExternalDeployments(
+	conf *config.Config,
+	cache cache.KialiCache,
+	clientFactory kubernetes.ClientFactory,
+	discovery istio.MeshDiscovery,
+	deploymentClient external_deployments.DeploymentClient,
+) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		vars := mux.Vars(r)
+		namespace := vars["namespace"]
+		app := vars["app"]
+
+		if len(app) == 0 {
+			RespondWithError(w, http.StatusBadRequest, "No app provided!")
+			return
+		}
+
+		repo := extractRepoName(app)
+		ds := external_deployments.NewDeploymentService(conf, deploymentClient)
+		if err := ds.SetRepo(ctx, repo); err != nil {
+			RespondWithError(w, http.StatusServiceUnavailable, fmt.Sprintf("no repository found for app %s %s", app, err))
+			return
+		}
+
+		cluster := clusterNameFromQuery(conf, r.URL.Query())
+		if _, err := checkNamespaceAccess(w, r, conf, cache, discovery, clientFactory, namespace, cluster); err != nil {
+			RespondWithError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+		params := models.DeploymentsQuery{Cluster: cluster, Namespace: namespace, Repository: repo}
 
 		if err := extractDeploymentQueryParams(r, &params, nil); err != nil {
 			RespondWithError(w, http.StatusBadRequest, err.Error())
